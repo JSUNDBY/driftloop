@@ -16,19 +16,27 @@ A single self-contained Web Audio app (plus one bowl sample). No frameworks, no 
 
 The chords are built as intervals from the bowl's own pitch, so it is always in tune with itself.
 
+The app lives in `public/` (`index.html` + `bowl.mp3`). It must be served (it fetches the mp3), not opened via `file://`.
+
 ## Run locally
 
-It must be served (it fetches the mp3), not opened via `file://`.
+On macOS, double-click `Driftloop.command`. Or:
 
 ```
-python3 -m http.server 8787
+python3 -m http.server 8787 --directory public
 # then open http://localhost:8787
 ```
 
-Or on macOS, double-click `Driftloop.command`.
+## Deploy
+
+Served as a static-assets Cloudflare Worker on the custom domain `driftloop.joshsundby.com`.
+
+```
+npx wrangler deploy
+```
 
 ## Make a different instrument
 
-Swap `bowl.mp3` for any sustained one-note sample (a cello, a held voice, a Rhodes). The whole engine re-voices around it.
+Swap `public/bowl.mp3` for any sustained one-note sample (a cello, a held voice, a Rhodes). The whole engine re-voices around it.
 
 Built by Josh Sundby.

@@ -10,4 +10,4 @@ echo ""
 echo "   Leave this window open while you listen."
 echo "   Close it (or press Ctrl+C) to stop."
 echo ""
-python3 -m http.server $PORT >/dev/null 2>&1
+python3 -m http.server $PORT --directory public >/dev/null 2>&1
