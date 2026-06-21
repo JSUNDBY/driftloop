@@ -17,14 +17,14 @@
   html,body{ margin:0; height:100%; background:var(--bg); }
   body{
     font-family:"Jost",sans-serif; color:var(--ink);
-    overflow-x:hidden; overflow-y:auto; overscroll-behavior:none; transition:background 5s ease;
+    overflow:hidden; overscroll-behavior:none; transition:background 5s ease;
   }
   canvas#bg{ position:fixed; inset:0; z-index:0; display:block; }
   .wrap{
-    position:relative; z-index:2; min-height:100svh; min-height:100dvh;
-    display:flex; flex-direction:column; align-items:center; justify-content:safe center;
+    position:relative; z-index:2; height:100svh; height:100dvh; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
     text-align:center; gap:6px;
-    padding:calc(env(safe-area-inset-top,0px) + 22px) 20px calc(env(safe-area-inset-bottom,0px) + 28px);
+    padding:calc(env(safe-area-inset-top,0px) + 22px) 20px calc(env(safe-area-inset-bottom,0px) + 22px);
   }
   .eyebrow{ font-size:11.5px; letter-spacing:3.5px; text-transform:uppercase; color:var(--accent); margin:0; transition:color 5s ease; }
   h1{ font-weight:300; font-size:clamp(2rem,7vw,3rem); letter-spacing:0.02em; margin:2px 0 0; }
@@ -55,17 +55,42 @@
   .insts{ margin:12px 0 2px; }
   .insts .chip{ font-size:13px; letter-spacing:1px; padding:7px 18px; }
 
-  .panel{
-    width:min(420px,94vw); margin-top:12px;
-    background:rgba(255,255,255,0.025); border:1px solid var(--line); border-radius:16px;
-    padding:16px 16px 14px;
-    opacity:0; max-height:0; overflow:hidden; pointer-events:none;
-    transition:opacity 1s ease, max-height 1s ease;
+  /* the button that opens the mixer (revealed after Begin) */
+  .mixer-open{
+    margin-top:14px; font-family:"Jost",sans-serif; font-size:12px; letter-spacing:2px; text-transform:uppercase;
+    color:rgba(233,238,242,0.72); background:rgba(255,255,255,0.04); border:1px solid var(--line);
+    border-radius:999px; padding:9px 24px; cursor:pointer;
+    opacity:0; transform:translateY(6px); pointer-events:none;
+    transition:opacity .8s ease, transform .8s ease, border-color .25s, color .25s;
   }
-  .panel.show{ opacity:1; max-height:1600px; overflow:visible; pointer-events:auto; }
-  .panel::-webkit-scrollbar{ width:0; }
+  .mixer-open.show{ opacity:1; transform:none; pointer-events:auto; }
+  .mixer-open:hover{ color:var(--ink); border-color:rgba(95,147,168,0.55); }
+
+  /* mixer: a bottom sheet that slides up over the player. fits the screen, no page scroll */
+  .mixer{
+    position:fixed; inset:0; z-index:10; display:flex; align-items:flex-end; justify-content:center;
+    background:rgba(4,6,12,0.5); -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px);
+    opacity:0; pointer-events:none; transition:opacity .35s ease;
+  }
+  .mixer.open{ opacity:1; pointer-events:auto; }
+  .mixer-card{
+    width:min(440px,100%); max-height:94svh; max-height:94dvh; overflow-y:auto;
+    background:#080b12; border:1px solid var(--line); border-radius:20px 20px 0 0;
+    padding:16px 18px calc(env(safe-area-inset-bottom,0px) + 16px);
+    transform:translateY(100%); transition:transform .42s cubic-bezier(.2,.8,.2,1);
+    display:flex; flex-direction:column;
+  }
+  .mixer.open .mixer-card{ transform:none; }
+  .mixer-card::-webkit-scrollbar{ width:0; }
+  .mixer-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .mixer-head span{ font-size:12px; letter-spacing:2.5px; text-transform:uppercase; color:var(--dim); }
+  .done{
+    font-family:"Jost",sans-serif; font-size:12px; letter-spacing:1.5px; text-transform:uppercase;
+    color:var(--ink); background:rgba(95,147,168,0.16); border:1px solid var(--accent);
+    border-radius:999px; padding:7px 18px; cursor:pointer;
+  }
+  .hint{ flex:1; text-align:left; font-size:11.5px; color:var(--dim); }
   .sect{ font-size:10.5px; letter-spacing:2px; text-transform:uppercase; color:rgba(233,238,242,0.34); text-align:left; margin:6px 2px 9px; }
-  .sect:first-child{ margin-top:0; }
 
   /* module row: toggle dot + name + fader */
   .mod{ display:flex; align-items:center; gap:11px; margin-bottom:11px; }
@@ -98,19 +123,21 @@
   .btn.rec.armed{ background:rgba(231,134,122,0.18); color:#ffd9d2; border-color:#e7867a; }
   .foot{ font-size:11px; letter-spacing:1px; color:rgba(233,238,242,0.3); margin-top:12px; }
 
-  /* phones: tighten the vertical stack so the rich panel fits, and let the page scroll */
+  /* compact for phones / short screens so each view fits without scrolling */
   @media (max-width:640px){
-    .wrap{ gap:3px; padding-top:calc(env(safe-area-inset-top,0px) + 16px); }
-    h1{ font-size:1.85rem; }
-    .tag{ font-size:12px; margin-bottom:2px; }
-    .orb{ width:92px; height:92px; margin:10px 0 2px; }
-    .presets{ margin:6px 0 2px; }
-    .panel{ margin-top:9px; padding:14px 14px 12px; }
-    .mod{ margin-bottom:9px; gap:10px; }
-    .mod label{ flex-basis:58px; }
-    .ctl{ margin-bottom:9px; }
-    .ctl label{ flex-basis:72px; }
-    .foot{ margin-top:10px; }
+    .wrap{ gap:4px; }
+    h1{ font-size:1.95rem; }
+    .orb{ width:108px; height:108px; margin:12px 0 4px; }
+  }
+  @media (max-height:700px){
+    .wrap{ gap:2px; }
+    .orb{ width:90px; height:90px; margin:8px 0 2px; }
+    .tag{ margin-bottom:2px; }
+    .mixer-open{ margin-top:10px; }
+    .mod{ margin-bottom:8px; }
+    .ctl{ margin-bottom:8px; }
+    .sect{ margin:4px 2px 7px; }
+    .mixer-head{ margin-bottom:6px; }
   }
 </style>
 </head>
@@ -127,7 +154,14 @@
   <div class="row presets" id="presets"></div>
   <div class="row scenes" id="scenes"></div>
 
-  <div class="panel" id="panel">
+  <button class="mixer-open" id="mixerOpen">Mixer</button>
+
+  <p class="foot">headphones, low volume, let it run</p>
+</div>
+
+<div class="mixer" id="mixer" aria-hidden="true">
+  <div class="mixer-card">
+    <div class="mixer-head"><span>Mixer</span><button class="done" id="mixerDone">Done</button></div>
     <div class="sect">Layers</div>
     <div id="mods"></div>
     <div class="sect">Field</div>
@@ -135,14 +169,12 @@
     <div class="ctl"><label>Space</label><input id="space" type="range" min="0" max="1" step="0.01" value="0.72" /></div>
     <div class="ctl"><label>Tape</label><input id="tape" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
     <div class="ctl"><label>Volume</label><input id="vol" type="range" min="0" max="1" step="0.01" value="0.7" /></div>
-    <div class="mod" id="tideRow"><button class="dot" id="tideDot" aria-label="tide"></button><label>Tide</label><span style="flex:1;text-align:left;font-size:11.5px;color:var(--dim)">slow self-evolving drift</span></div>
+    <div class="mod" id="tideRow"><button class="dot" id="tideDot" aria-label="tide"></button><label>Tide</label><span class="hint">slow self-evolving drift</span></div>
     <div class="actions">
       <button class="btn rec" id="rec">Record</button>
       <button class="btn" id="save">Save mine</button>
     </div>
   </div>
-
-  <p class="foot">headphones, low volume, let it run</p>
 </div>
 
 <script>
@@ -409,14 +441,14 @@ async function start(){
   timers.push(setTimeout(pulse,1500));
   timers.push(setTimeout(airDrift,6000));
   tideTimer=setInterval(tideTick,1000);
-  orb.textContent="Drifting"; panel.classList.add("show");
+  orb.textContent="Drifting"; mixerOpen.classList.add("show");
 }
 function stop(){
   playing=false;
   timers.forEach(clearTimeout); timers=[];
   if(tideTimer){ clearInterval(tideTimer); tideTimer=null; }
   if(recorder && recorder.state==="recording"){ try{ recorder.stop(); }catch(e){} }
-  orb.textContent="Begin"; orb.classList.remove("live"); panel.classList.remove("show");
+  orb.textContent="Begin"; orb.classList.remove("live"); mixerOpen.classList.remove("show"); closeMixer();
   if(!ctx) return;
   const c=ctx,t=ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0.0001,t+2);
   setTimeout(()=>{ try{ c.close(); }catch(e){} },2200);
@@ -444,7 +476,13 @@ function toggleRec(){
 
 // ---- UI build ----
 const orb=document.getElementById("orb");
-const panel=document.getElementById("panel");
+const mixerOpen=document.getElementById("mixerOpen");
+const mixer=document.getElementById("mixer");
+function openMixer(){ mixer.classList.add("open"); mixer.setAttribute("aria-hidden","false"); }
+function closeMixer(){ mixer.classList.remove("open"); mixer.setAttribute("aria-hidden","true"); }
+mixerOpen.onclick=openMixer;
+document.getElementById("mixerDone").onclick=closeMixer;
+mixer.addEventListener("click",e=>{ if(e.target===mixer) closeMixer(); }); // tap the dimmed area to close
 const scenesEl=document.getElementById("scenes");
 const presetsEl=document.getElementById("presets");
 const instEl=document.getElementById("insts");
