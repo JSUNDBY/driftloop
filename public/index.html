@@ -17,14 +17,14 @@
   html,body{ margin:0; height:100%; background:var(--bg); }
   body{
     font-family:"Jost",sans-serif; color:var(--ink);
-    overflow:hidden; overscroll-behavior:none; transition:background 5s ease;
+    overflow-x:hidden; overflow-y:auto; overscroll-behavior:none; transition:background 5s ease;
   }
   canvas#bg{ position:fixed; inset:0; z-index:0; display:block; }
   .wrap{
     position:relative; z-index:2; min-height:100svh; min-height:100dvh;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    display:flex; flex-direction:column; align-items:center; justify-content:safe center;
     text-align:center; gap:6px;
-    padding:calc(env(safe-area-inset-top,0px) + 22px) 20px calc(env(safe-area-inset-bottom,0px) + 22px);
+    padding:calc(env(safe-area-inset-top,0px) + 22px) 20px calc(env(safe-area-inset-bottom,0px) + 28px);
   }
   .eyebrow{ font-size:11.5px; letter-spacing:3.5px; text-transform:uppercase; color:var(--accent); margin:0; transition:color 5s ease; }
   h1{ font-weight:300; font-size:clamp(2rem,7vw,3rem); letter-spacing:0.02em; margin:2px 0 0; }
@@ -60,7 +60,7 @@
     opacity:0; max-height:0; overflow:hidden; pointer-events:none;
     transition:opacity 1s ease, max-height 1s ease;
   }
-  .panel.show{ opacity:1; max-height:74vh; overflow-y:auto; pointer-events:auto; }
+  .panel.show{ opacity:1; max-height:1600px; overflow:visible; pointer-events:auto; }
   .panel::-webkit-scrollbar{ width:0; }
   .sect{ font-size:10.5px; letter-spacing:2px; text-transform:uppercase; color:rgba(233,238,242,0.34); text-align:left; margin:6px 2px 9px; }
   .sect:first-child{ margin-top:0; }
@@ -95,6 +95,21 @@
   .btn.rec{ color:#e7867a; border-color:rgba(231,134,122,0.4); }
   .btn.rec.armed{ background:rgba(231,134,122,0.18); color:#ffd9d2; border-color:#e7867a; }
   .foot{ font-size:11px; letter-spacing:1px; color:rgba(233,238,242,0.3); margin-top:12px; }
+
+  /* phones: tighten the vertical stack so the rich panel fits, and let the page scroll */
+  @media (max-width:640px){
+    .wrap{ gap:3px; padding-top:calc(env(safe-area-inset-top,0px) + 16px); }
+    h1{ font-size:1.85rem; }
+    .tag{ font-size:12px; margin-bottom:2px; }
+    .orb{ width:92px; height:92px; margin:10px 0 2px; }
+    .presets{ margin:6px 0 2px; }
+    .panel{ margin-top:9px; padding:14px 14px 12px; }
+    .mod{ margin-bottom:9px; gap:10px; }
+    .mod label{ flex-basis:58px; }
+    .ctl{ margin-bottom:9px; }
+    .ctl label{ flex-basis:72px; }
+    .foot{ margin-top:10px; }
+  }
 </style>
 </head>
 <body>
