@@ -52,6 +52,8 @@
   .presets{ margin:8px 0 2px; }
   .presets .chip{ font-size:12px; letter-spacing:1px; text-transform:uppercase; color:rgba(233,238,242,0.7); }
   .scenes{ margin:4px 0 2px; }
+  .insts{ margin:12px 0 2px; }
+  .insts .chip{ font-size:13px; letter-spacing:1px; padding:7px 18px; }
 
   .panel{
     width:min(420px,94vw); margin-top:12px;
@@ -117,10 +119,11 @@
 <div class="wrap">
   <p class="eyebrow" id="eyebrow">generative ambient · for josh</p>
   <h1>Driftloop</h1>
-  <p class="tag">One singing bowl, six layers, endlessly recombined. It never repeats.</p>
+  <p class="tag">A sampled drone, six layers, endlessly recombined. It never repeats.</p>
 
   <button class="orb" id="orb">Begin</button>
 
+  <div class="row insts" id="insts"></div>
   <div class="row presets" id="presets"></div>
   <div class="row scenes" id="scenes"></div>
 
@@ -186,9 +189,16 @@ const PRESETS = {
 };
 
 // ---- bowl sample ----
-let bowlBytes=null, bowlBuf=null;
-const bowlReady = fetch("bowl.mp3").then(r=>{ if(!r.ok) throw 0; return r.arrayBuffer(); })
-  .then(b=>{ bowlBytes=b; }).catch(()=>{ bowlBytes=null; });
+const INSTRUMENTS = { bowl:{ name:"Bowl", file:"bowl.mp3" }, cathedral:{ name:"Cathedral", file:"cathedral.mp3" } };
+let instKey="bowl";
+let bowlBuf=null;            // the active instrument's decoded buffer (voices read this)
+const instBytes={};         // fetched arrayBuffers, cached per instrument
+function loadInstBytes(key){
+  if(instBytes[key]) return Promise.resolve(instBytes[key]);
+  return fetch(INSTRUMENTS[key].file).then(r=>{ if(!r.ok) throw 0; return r.arrayBuffer(); })
+    .then(b=>{ instBytes[key]=b; return b; }).catch(()=>null);
+}
+Object.keys(INSTRUMENTS).forEach(loadInstBytes); // prefetch both so switching is instant
 
 // ---- audio graph ----
 let ctx=null, playing=false, timers=[], tideTimer=null;
@@ -266,7 +276,7 @@ function applyAll(){
   MOD_ORDER.forEach(k=>{ if(M[k].gain) M[k].gain.gain.setTargetAtTime(M[k].on?M[k].level:0.0001,t,0.5); });
 }
 
-async function decodeBowl(){ await bowlReady; if(!bowlBytes){ bowlBuf=null; return; } try{ bowlBuf=await ctx.decodeAudioData(bowlBytes.slice(0)); }catch(e){ bowlBuf=null; } }
+async function decodeBowl(){ const bytes=await loadInstBytes(instKey); if(!bytes||!ctx){ bowlBuf=null; return; } try{ bowlBuf=await ctx.decodeAudioData(bytes.slice(0)); }catch(e){ bowlBuf=null; } }
 
 // ---- voices ----
 function bowlVoice(semis, when, dur, peak, dest, o){
@@ -429,8 +439,17 @@ const orb=document.getElementById("orb");
 const panel=document.getElementById("panel");
 const scenesEl=document.getElementById("scenes");
 const presetsEl=document.getElementById("presets");
+const instEl=document.getElementById("insts");
 const modsEl=document.getElementById("mods");
 
+Object.keys(INSTRUMENTS).forEach(k=>{ const b=document.createElement("button"); b.className="chip"+(k===instKey?" on":""); b.textContent=INSTRUMENTS[k].name; b.dataset.k=k; b.onclick=()=>setInstrument(k); instEl.appendChild(b); });
+async function setInstrument(k){
+  if(!INSTRUMENTS[k]) return; instKey=k;
+  [...instEl.children].forEach(c=>c.classList.toggle("on",c.dataset.k===k));
+  loadInstBytes(k);
+  if(playing && ctx){ await decodeBowl(); }  // existing voices ring out on the old timbre; new ones use this
+  saveLast();
+}
 Object.keys(SCENES).forEach(k=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=SCENES[k].name; b.dataset.k=k; b.onclick=()=>setScene(k); scenesEl.appendChild(b); });
 function presetNames(){ const names=Object.keys(PRESETS); if(localStorage.getItem("driftloop:mine")) names.push("Mine"); return names; }
 function renderPresets(){ presetsEl.innerHTML=""; presetNames().forEach(n=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=n; b.onclick=()=>applyPreset(n); presetsEl.appendChild(b); }); }
@@ -458,9 +477,10 @@ document.getElementById("rec").onclick=toggleRec;
 document.getElementById("save").onclick=()=>{ localStorage.setItem("driftloop:mine",JSON.stringify(snapshot())); renderPresets(); const b=document.getElementById("save"); b.textContent="Saved"; setTimeout(()=>b.textContent="Save mine",1400); };
 
 // ---- config snapshot / apply / persist ----
-function snapshot(){ const m={}; MOD_ORDER.forEach(k=>m[k]=[M[k].on?1:0,M[k].level]); return { scene:sceneKey, p:{...P}, m }; }
+function snapshot(){ const m={}; MOD_ORDER.forEach(k=>m[k]=[M[k].on?1:0,M[k].level]); return { scene:sceneKey, inst:instKey, p:{...P}, m }; }
 function applyConfig(c){
   if(c.scene && SCENES[c.scene]) sceneKey=c.scene;
+  if(c.inst && INSTRUMENTS[c.inst]) instKey=c.inst;
   if(c.p) Object.assign(P,c.p);
   if(c.m) MOD_ORDER.forEach(k=>{ if(c.m[k]){ M[k].on=!!c.m[k][0]; M[k].level=c.m[k][1]; } });
   syncUI(); if(ctx) applyAll();
@@ -468,6 +488,7 @@ function applyConfig(c){
 function applyPreset(n){ const c = n==="Mine"? JSON.parse(localStorage.getItem("driftloop:mine")) : PRESETS[n]; if(c){ applyConfig(c); saveLast(); } }
 function syncUI(){
   setScene(sceneKey);
+  [...instEl.children].forEach(c=>c.classList.toggle("on",c.dataset.k===instKey));
   document.getElementById("movement").value=P.movement; document.getElementById("space").value=P.space;
   document.getElementById("tape").value=P.tape; document.getElementById("vol").value=P.vol; setTide(P.tide);
   MOD_ORDER.forEach(k=>{ const row=modsEl.querySelector(`.mod[data-k="${k}"]`); if(!row) return; row.classList.toggle("off",!M[k].on); row.querySelector(".dot").classList.toggle("on",M[k].on); row.querySelector("input").value=M[k].level; });
