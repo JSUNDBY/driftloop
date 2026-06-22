@@ -54,6 +54,25 @@
   .scenes{ margin:4px 0 2px; }
   .insts{ margin:12px 0 2px; }
   .insts .chip{ font-size:13px; letter-spacing:1px; padding:7px 18px; }
+  .insts .chip .x{ margin-left:7px; opacity:0.5; font-size:14px; line-height:1; }
+  .insts .chip .x:hover{ opacity:1; color:#e7867a; }
+  .insts .chip.load{ color:var(--accent); border-style:dashed; }
+
+  /* mixer help panel + toggle */
+  .head-r{ display:flex; align-items:center; gap:8px; }
+  .help-toggle{
+    width:26px; height:26px; border-radius:50%; padding:0; cursor:pointer;
+    font-family:"Jost",sans-serif; font-size:13px; color:var(--dim);
+    background:rgba(255,255,255,0.04); border:1px solid var(--line);
+  }
+  .help-toggle:hover{ color:var(--ink); border-color:rgba(95,147,168,0.5); }
+  .help{
+    text-align:left; font-size:11.8px; line-height:1.5; color:rgba(233,238,242,0.62);
+    background:rgba(95,147,168,0.07); border:1px solid var(--line); border-radius:12px;
+    padding:10px 13px; margin:0 0 12px;
+  }
+  .help p{ margin:0 0 7px; } .help p:last-child{ margin:0; }
+  .help b{ color:rgba(233,238,242,0.92); font-weight:500; }
 
   /* the button that opens the mixer (revealed after Begin) */
   .mixer-open{
@@ -161,13 +180,20 @@
 
 <div class="mixer" id="mixer" aria-hidden="true">
   <div class="mixer-card">
-    <div class="mixer-head"><span>Mixer</span><button class="done" id="mixerDone">Done</button></div>
+    <div class="mixer-head"><span>Mixer</span><div class="head-r"><button class="help-toggle" id="helpToggle">?</button><button class="done" id="mixerDone">Done</button></div></div>
+    <div class="help" id="help" hidden>
+      <p><b>Layers</b> are the sounds playing at once. The dot turns each on or off; the slider is its volume.</p>
+      <p><b>Drone</b> the held chords · <b>Bass</b> the low foundation · <b>Shimmer</b> a sparkle cloud · <b>Bells</b> stray high notes · <b>Sub</b> a slow heartbeat · <b>Air</b> a faint texture bed · <b>Light</b> an airy synth.</p>
+      <p><b>Field</b> shapes the whole feel. <b>Movement</b> how often notes appear · <b>Space</b> reverb size · <b>Tape</b> warmth + hiss · <b>Age</b> tape wear, darker and noisier the higher it goes (the Basinski move) · <b>Volume</b> loudness · <b>Tide</b> lets it slowly evolve on its own.</p>
+      <p>The <b>Bowl / Cathedral</b> chips up top are the instrument. <b>+ Load sound</b> (or drag a file in) turns any audio on your drive into a new tape-looped instrument.</p>
+    </div>
     <div class="sect">Layers</div>
     <div id="mods"></div>
     <div class="sect">Field</div>
     <div class="ctl"><label>Movement</label><input id="movement" type="range" min="0" max="1" step="0.01" value="0.3" /></div>
     <div class="ctl"><label>Space</label><input id="space" type="range" min="0" max="1" step="0.01" value="0.72" /></div>
     <div class="ctl"><label>Tape</label><input id="tape" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
+    <div class="ctl"><label>Age</label><input id="age" type="range" min="0" max="1" step="0.01" value="0" /></div>
     <div class="ctl"><label>Volume</label><input id="vol" type="range" min="0" max="1" step="0.01" value="0.7" /></div>
     <div class="mod" id="tideRow"><button class="dot" id="tideDot" aria-label="tide"></button><label>Tide</label><span class="hint">slow self-evolving drift</span></div>
     <div class="actions">
@@ -200,37 +226,69 @@ let curVoicing = SCENES.submers.pads[0];
 // ---- modular layers ----
 const M = {
   drone:   { name:"Drone",   on:true,  level:0.82, rev:0.85 },
+  bass:    { name:"Bass",    on:true,  level:0.5,  rev:0.25 },
   shimmer: { name:"Shimmer", on:true,  level:0.4,  rev:1.0  },
   bells:   { name:"Bells",   on:true,  level:0.55, rev:1.0  },
   sub:     { name:"Sub",     on:false, level:0.55, rev:0.25 },
   air:     { name:"Air",     on:false, level:0.35, rev:0.4  },
   light:   { name:"Light",   on:false, level:0.4,  rev:0.9  }
 };
-const MOD_ORDER = ["drone","shimmer","bells","sub","air","light"];
+const MOD_ORDER = ["drone","bass","shimmer","bells","sub","air","light"];
 
-const P = { movement:0.3, space:0.72, tape:0.5, vol:0.7, tide:false };
+// age = Basinski-style tape disintegration: darker + noisier the higher it goes
+const P = { movement:0.3, space:0.72, tape:0.5, age:0.0, vol:0.7, tide:false };
 
 // ---- built-in presets ----
 const PRESETS = {
-  Submersion: { scene:"submers", p:{movement:0.24,space:0.8,tape:0.6,vol:0.7,tide:false},
-    m:{ drone:[1,.85], shimmer:[1,.32], bells:[1,.5], sub:[1,.55], air:[0,.35], light:[0,.4] } },
-  "Glass Rain": { scene:"glacier", p:{movement:0.55,space:0.86,tape:0.32,vol:0.68,tide:false},
-    m:{ drone:[1,.6], shimmer:[1,.72], bells:[1,.8], sub:[0,.5], air:[0,.3], light:[1,.5] } },
-  "Night Tide": { scene:"embers", p:{movement:0.2,space:0.76,tape:0.7,vol:0.7,tide:true},
-    m:{ drone:[1,.82], shimmer:[1,.46], bells:[1,.34], sub:[1,.6], air:[0,.3], light:[1,.26] } }
+  Submersion: { scene:"submers", p:{movement:0.24,space:0.8,tape:0.6,age:0.0,vol:0.7,tide:false},
+    m:{ drone:[1,.85], bass:[1,.55], shimmer:[1,.32], bells:[1,.5], sub:[1,.55], air:[0,.35], light:[0,.4] } },
+  "Glass Rain": { scene:"glacier", p:{movement:0.55,space:0.86,tape:0.32,age:0.0,vol:0.68,tide:false},
+    m:{ drone:[1,.6], bass:[1,.32], shimmer:[1,.72], bells:[1,.8], sub:[0,.5], air:[0,.3], light:[1,.5] } },
+  "Night Tide": { scene:"embers", p:{movement:0.2,space:0.76,tape:0.7,age:0.25,vol:0.7,tide:true},
+    m:{ drone:[1,.82], bass:[1,.6], shimmer:[1,.46], bells:[1,.34], sub:[1,.6], air:[0,.3], light:[1,.26] } }
 };
 
-// ---- bowl sample ----
+// ---- instruments: two bundled, plus any sounds you load from disk (kept in IndexedDB) ----
 const INSTRUMENTS = { bowl:{ name:"Bowl", file:"bowl.mp3" }, cathedral:{ name:"Cathedral", file:"cathedral.mp3" } };
 let instKey="bowl";
 let bowlBuf=null;            // the active instrument's decoded buffer (voices read this)
-const instBytes={};         // fetched arrayBuffers, cached per instrument
+const instBytes={};         // arrayBuffers cached per instrument key
 function loadInstBytes(key){
   if(instBytes[key]) return Promise.resolve(instBytes[key]);
-  return fetch(INSTRUMENTS[key].file).then(r=>{ if(!r.ok) throw 0; return r.arrayBuffer(); })
+  const inst=INSTRUMENTS[key]; if(!inst) return Promise.resolve(null);
+  if(inst.file) return fetch(inst.file).then(r=>{ if(!r.ok) throw 0; return r.arrayBuffer(); })
     .then(b=>{ instBytes[key]=b; return b; }).catch(()=>null);
+  return Promise.resolve(instBytes[key]||null); // loaded sounds live in instBytes already
 }
-Object.keys(INSTRUMENTS).forEach(loadInstBytes); // prefetch both so switching is instant
+
+// IndexedDB so your loaded sounds survive reloads (for performing)
+function idbOpen(){ return new Promise((res,rej)=>{ const r=indexedDB.open("driftloop",1); r.onupgradeneeded=()=>r.result.createObjectStore("sounds",{keyPath:"id"}); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+function idbPut(rec){ return idbOpen().then(db=>new Promise((res,rej)=>{ const tx=db.transaction("sounds","readwrite"); tx.objectStore("sounds").put(rec); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); })); }
+function idbAll(){ return idbOpen().then(db=>new Promise(res=>{ const rq=db.transaction("sounds","readonly").objectStore("sounds").getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); })).catch(()=>[]); }
+function idbDel(id){ return idbOpen().then(db=>new Promise(res=>{ const tx=db.transaction("sounds","readwrite"); tx.objectStore("sounds").delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>res(); })).catch(()=>{}); }
+
+function canDecode(bytes){ // validate a file before adding it
+  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
+  if(!OAC) return Promise.resolve(true);
+  try{ return new OAC(1,1,44100).decodeAudioData(bytes.slice(0)).then(()=>true,()=>false); }
+  catch(e){ return Promise.resolve(false); }
+}
+async function addUserSound(file){
+  const bytes=await file.arrayBuffer();
+  if(!(await canDecode(bytes))){ flash("Couldn't read "+file.name); return; }
+  const id="u_"+Date.now()+"_"+Math.floor(Math.random()*1e4);
+  const name=file.name.replace(/\.[^.]+$/,"").slice(0,16);
+  instBytes[id]=bytes; INSTRUMENTS[id]={ name, user:true };
+  idbPut({ id, name, bytes });
+  renderInstruments(); setInstrument(id);
+  flash("Loaded "+name);
+}
+async function removeUserSound(id){
+  delete INSTRUMENTS[id]; delete instBytes[id]; idbDel(id);
+  if(instKey===id) setInstrument("bowl");
+  renderInstruments();
+}
+Object.keys(INSTRUMENTS).forEach(loadInstBytes); // prefetch the two bundled instruments
 
 // ---- audio graph ----
 let ctx=null, playing=false, timers=[], tideTimer=null;
@@ -298,13 +356,15 @@ function build(){
   const t=ctx.currentTime; master.gain.setValueAtTime(0.0001,t); master.gain.exponentialRampToValueAtTime(Math.max(0.001,P.vol),t+5);
 }
 
+function brightnessBase(){ return 6500 - P.age*5400; }  // age darkens the whole sound (worn tape)
 function applyAll(){
   if(!ctx) return; const t=ctx.currentTime;
   master.gain.setTargetAtTime(Math.max(0.0001,P.vol),t,0.4);
   reverbReturn.gain.setTargetAtTime(P.space,t,0.5);
   tapeSat.curve=satCurve(1+P.tape*3);
-  if(wowGain) wowGain.gain.setTargetAtTime(3+P.tape*6,t,0.5);
-  if(hissGain) hissGain.gain.setTargetAtTime(P.tape*0.016,t,0.6);
+  if(wowGain) wowGain.gain.setTargetAtTime(3+P.tape*6+P.age*5,t,0.5);  // age also adds flutter
+  if(hissGain) hissGain.gain.setTargetAtTime(P.tape*0.016+P.age*0.02,t,0.6);  // age adds tape noise
+  if(!P.tide) toneLP.frequency.setTargetAtTime(brightnessBase(),t,0.5);
   MOD_ORDER.forEach(k=>{ if(M[k].gain) M[k].gain.gain.setTargetAtTime(M[k].on?M[k].level:0.0001,t,0.5); });
 }
 
@@ -343,6 +403,8 @@ function nextChord(){
   curVoicing=shape;
   const dur=46+Math.random()*22, now=ctx.currentTime+0.05;
   shape.forEach((semis,i)=> bowlVoice(semis, now, dur, 0.07+Math.random()*0.02, M.drone.gain, { pan:(i-1)*0.35 }));
+  // bass: the low foundation, the chord root dropped two octaves and heavily lowpassed
+  if(M.bass.on) bowlVoice(shape[0]-24, now, dur, 0.22, M.bass.gain, { cutoff:95, atk:9, rel:14, pan:0 });
   timers.push(setTimeout(nextChord, dur*0.6*1000));
 }
 
@@ -422,7 +484,8 @@ function tideTick(){
   tidePhase+=0.013;
   if(P.tide){
     const b=Math.sin(tidePhase)*0.5+0.5;          // 0..1 slow
-    toneLP.frequency.setTargetAtTime(4200+b*4200, ctx.currentTime, 3);
+    const base=brightnessBase();
+    toneLP.frequency.setTargetAtTime(clamp(base*(0.62+0.55*b),600,9000), ctx.currentTime, 3);
     reverbReturn.gain.setTargetAtTime(clamp(P.space+(b-0.5)*0.25,0,1), ctx.currentTime, 3);
   }
 }
@@ -482,13 +545,23 @@ function openMixer(){ mixer.classList.add("open"); mixer.setAttribute("aria-hidd
 function closeMixer(){ mixer.classList.remove("open"); mixer.setAttribute("aria-hidden","true"); }
 mixerOpen.onclick=openMixer;
 document.getElementById("mixerDone").onclick=closeMixer;
+document.getElementById("helpToggle").onclick=()=>{ const h=document.getElementById("help"); h.hidden=!h.hidden; };
 mixer.addEventListener("click",e=>{ if(e.target===mixer) closeMixer(); }); // tap the dimmed area to close
 const scenesEl=document.getElementById("scenes");
 const presetsEl=document.getElementById("presets");
 const instEl=document.getElementById("insts");
 const modsEl=document.getElementById("mods");
 
-Object.keys(INSTRUMENTS).forEach(k=>{ const b=document.createElement("button"); b.className="chip"+(k===instKey?" on":""); b.textContent=INSTRUMENTS[k].name; b.dataset.k=k; b.onclick=()=>setInstrument(k); instEl.appendChild(b); });
+function renderInstruments(){
+  instEl.innerHTML="";
+  Object.keys(INSTRUMENTS).forEach(k=>{
+    const b=document.createElement("button"); b.className="chip"+(k===instKey?" on":""); b.dataset.k=k;
+    b.appendChild(document.createTextNode(INSTRUMENTS[k].name));
+    if(INSTRUMENTS[k].user){ const x=document.createElement("span"); x.className="x"; x.textContent="×"; x.onclick=e=>{ e.stopPropagation(); removeUserSound(k); }; b.appendChild(x); }
+    b.onclick=()=>setInstrument(k); instEl.appendChild(b);
+  });
+  const load=document.createElement("button"); load.className="chip load"; load.textContent="+ Load sound"; load.onclick=()=>fileInput.click(); instEl.appendChild(load);
+}
 async function setInstrument(k){
   if(!INSTRUMENTS[k]) return; instKey=k;
   [...instEl.children].forEach(c=>c.classList.toggle("on",c.dataset.k===k));
@@ -496,6 +569,12 @@ async function setInstrument(k){
   if(playing && ctx){ await decodeBowl(); }  // existing voices ring out on the old timbre; new ones use this
   saveLast();
 }
+// hidden file picker + drag-and-drop loading
+const fileInput=document.createElement("input"); fileInput.type="file"; fileInput.accept="audio/*"; fileInput.multiple=true; fileInput.style.display="none"; document.body.appendChild(fileInput);
+fileInput.onchange=()=>{ [...fileInput.files].forEach(addUserSound); fileInput.value=""; };
+["dragover","drop"].forEach(ev=>window.addEventListener(ev,e=>{ e.preventDefault(); }));
+window.addEventListener("drop",e=>{ const fs=[...(e.dataTransfer?e.dataTransfer.files:[])].filter(f=>f.type.startsWith("audio")); fs.forEach(addUserSound); });
+function flash(msg){ const f=document.querySelector(".foot"); if(!f) return; const prev=f.textContent; f.textContent=msg; clearTimeout(flash._t); flash._t=setTimeout(()=>{ f.textContent=prev; },2200); }
 Object.keys(SCENES).forEach(k=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=SCENES[k].name; b.dataset.k=k; b.onclick=()=>setScene(k); scenesEl.appendChild(b); });
 function presetNames(){ const names=Object.keys(PRESETS); if(localStorage.getItem("driftloop:mine")) names.push("Mine"); return names; }
 function renderPresets(){ presetsEl.innerHTML=""; presetNames().forEach(n=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=n; b.onclick=()=>applyPreset(n); presetsEl.appendChild(b); }); }
@@ -513,7 +592,7 @@ function toggleMod(k){ const m=M[k]; m.on=!m.on; const row=modsEl.querySelector(
 function setScene(k){ sceneKey=k; [...scenesEl.children].forEach(c=>c.classList.toggle("on",c.dataset.k===k)); const s=SCENES[k]; document.documentElement.style.setProperty("--accent",s.color); document.body.style.background=s.bg; if(playing) chordIdx=0; saveLast(); }
 
 function bind(id,key){ const el=document.getElementById(id); el.oninput=()=>{ P[key]=parseFloat(el.value); applyAll(); saveLast(); }; }
-bind("movement","movement"); bind("space","space"); bind("tape","tape"); bind("vol","vol");
+bind("movement","movement"); bind("space","space"); bind("tape","tape"); bind("age","age"); bind("vol","vol");
 const tideDot=document.getElementById("tideDot");
 function setTide(v){ P.tide=v; tideDot.classList.toggle("on",v); }
 tideDot.onclick=()=>{ setTide(!P.tide); saveLast(); };
@@ -536,14 +615,20 @@ function syncUI(){
   setScene(sceneKey);
   [...instEl.children].forEach(c=>c.classList.toggle("on",c.dataset.k===instKey));
   document.getElementById("movement").value=P.movement; document.getElementById("space").value=P.space;
-  document.getElementById("tape").value=P.tape; document.getElementById("vol").value=P.vol; setTide(P.tide);
+  document.getElementById("tape").value=P.tape; document.getElementById("age").value=P.age; document.getElementById("vol").value=P.vol; setTide(P.tide);
   MOD_ORDER.forEach(k=>{ const row=modsEl.querySelector(`.mod[data-k="${k}"]`); if(!row) return; row.classList.toggle("off",!M[k].on); row.querySelector(".dot").classList.toggle("on",M[k].on); row.querySelector("input").value=M[k].level; });
 }
 function saveLast(){ try{ localStorage.setItem("driftloop:last",JSON.stringify(snapshot())); }catch(e){} }
 
-// init from last session, else default preset
+// init: load any saved sounds from IndexedDB, then restore last session (or default preset)
 renderPresets();
-(function init(){ const last=localStorage.getItem("driftloop:last"); if(last){ try{ applyConfig(JSON.parse(last)); return; }catch(e){} } applyConfig(PRESETS.Submersion); })();
+(async function init(){
+  try{ const saved=await idbAll(); saved.forEach(s=>{ INSTRUMENTS[s.id]={ name:s.name, user:true }; instBytes[s.id]=s.bytes; }); }catch(e){}
+  renderInstruments();
+  const last=localStorage.getItem("driftloop:last");
+  if(last){ try{ applyConfig(JSON.parse(last)); renderInstruments(); return; }catch(e){} }
+  applyConfig(PRESETS.Submersion);
+})();
 
 // ---- generative visual driven by the audio ----
 const cv=document.getElementById("bg"), g2=cv.getContext("2d");
