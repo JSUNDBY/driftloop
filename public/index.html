@@ -277,10 +277,13 @@ function idbPut(rec){ return idbOpen().then(db=>new Promise((res,rej)=>{ const t
 function idbAll(){ return idbOpen().then(db=>new Promise(res=>{ const rq=db.transaction("sounds","readonly").objectStore("sounds").getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); })).catch(()=>[]); }
 function idbDel(id){ return idbOpen().then(db=>new Promise(res=>{ const tx=db.transaction("sounds","readwrite"); tx.objectStore("sounds").delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>res(); })).catch(()=>{}); }
 
+// ONE reused AudioContext for all decoding/waveforms. iOS caps the number of
+// audio contexts a page may create and doesn't free them on refresh, so making a
+// throwaway context per load/record used to jam after a couple of sounds.
+let _decAC=null;
+function decAC(){ if(!_decAC){ const A=window.AudioContext||window.webkitAudioContext; _decAC=new A(); } return _decAC; }
 function canDecode(bytes){ // validate a file before adding it
-  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext;
-  if(!OAC) return Promise.resolve(true);
-  try{ return new OAC(1,1,44100).decodeAudioData(bytes.slice(0)).then(()=>true,()=>false); }
+  try{ return decAC().decodeAudioData(bytes.slice(0)).then(()=>true,()=>false); }
   catch(e){ return Promise.resolve(false); }
 }
 async function addUserSound(file){
@@ -622,8 +625,7 @@ const peaksCache={};
 async function loadPeaks(key){
   if(peaksCache[key]) return peaksCache[key];
   const bytes=await loadInstBytes(key); if(!bytes) return null;
-  const OAC=window.OfflineAudioContext||window.webkitOfflineAudioContext; if(!OAC) return null;
-  let buf; try{ buf=await new OAC(1,1,44100).decodeAudioData(bytes.slice(0)); }catch(e){ return null; }
+  let buf; try{ buf=await decAC().decodeAudioData(bytes.slice(0)); }catch(e){ return null; }
   const ch=buf.getChannelData(0), N=520, peaks=new Float32Array(N), block=Math.max(1,Math.floor(ch.length/N));
   let pk=0; for(let i=0;i<N;i++){ let mx=0,s=i*block; for(let j=0;j<block;j++){ const v=Math.abs(ch[s+j]||0); if(v>mx)mx=v; } peaks[i]=mx; if(mx>pk)pk=mx; }
   if(pk>0) for(let i=0;i<N;i++) peaks[i]/=pk;
