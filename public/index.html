@@ -57,6 +57,8 @@
   .insts .chip .x{ margin-left:7px; opacity:0.5; font-size:14px; line-height:1; }
   .insts .chip .x:hover{ opacity:1; color:#e7867a; }
   .insts .chip.load{ color:var(--accent); border-style:dashed; }
+  .insts .chip.mic{ color:#e7867a; border-color:rgba(231,134,122,0.4); }
+  .insts .chip.mic.on{ color:#ffd9d2; background:rgba(231,134,122,0.18); border-color:#e7867a; }
 
   /* mixer help panel + toggle */
   .head-r{ display:flex; align-items:center; gap:8px; }
@@ -569,6 +571,7 @@ function renderInstruments(){
     b.onclick=()=>setInstrument(k); instEl.appendChild(b);
   });
   const load=document.createElement("button"); load.className="chip load"; load.textContent="+ Load sound"; load.onclick=()=>fileInput.click(); instEl.appendChild(load);
+  const mic=document.createElement("button"); mic.className="chip mic"; mic.textContent="● Record"; mic.onclick=()=>recordMic(mic); instEl.appendChild(mic);
 }
 async function setInstrument(k){
   if(!INSTRUMENTS[k]) return; instKey=k;
@@ -579,11 +582,34 @@ async function setInstrument(k){
   saveLast();
 }
 // hidden file picker + drag-and-drop loading
-const fileInput=document.createElement("input"); fileInput.type="file"; fileInput.accept="audio/*"; fileInput.multiple=true; fileInput.style.display="none"; document.body.appendChild(fileInput);
-fileInput.onchange=()=>{ [...fileInput.files].forEach(addUserSound); fileInput.value=""; };
+const fileInput=document.createElement("input"); fileInput.type="file"; fileInput.accept="audio/*,video/*"; fileInput.multiple=true; fileInput.style.display="none"; document.body.appendChild(fileInput);
+fileInput.onchange=()=>{ [...fileInput.files].forEach(addUserSound); fileInput.value=""; };  // video files: their audio track is decoded
 ["dragover","drop"].forEach(ev=>window.addEventListener(ev,e=>{ e.preventDefault(); }));
-window.addEventListener("drop",e=>{ const fs=[...(e.dataTransfer?e.dataTransfer.files:[])].filter(f=>f.type.startsWith("audio")); fs.forEach(addUserSound); });
-function flash(msg){ const f=document.querySelector(".foot"); if(!f) return; const prev=f.textContent; f.textContent=msg; clearTimeout(flash._t); flash._t=setTimeout(()=>{ f.textContent=prev; },2200); }
+window.addEventListener("drop",e=>{ const fs=[...(e.dataTransfer?e.dataTransfer.files:[])].filter(f=>f.type.startsWith("audio")||f.type.startsWith("video")); fs.forEach(addUserSound); });
+function flash(msg){ const f=document.querySelector(".foot"); if(!f) return; const prev=f.textContent; f.textContent=msg; clearTimeout(flash._t); flash._t=setTimeout(()=>{ f.textContent=prev; },2600); }
+
+// record a loop straight from the phone (or computer) mic -> becomes a tape-looped instrument
+let micRec=null, micChunks=[], micN=0;
+async function recordMic(btn){
+  if(micRec && micRec.state==="recording"){ micRec.stop(); return; }
+  if(!navigator.mediaDevices || !window.MediaRecorder){ flash("Recording isn't supported on this browser"); return; }
+  const mime=pickMime(); if(!mime){ flash("Recording isn't supported here"); return; }
+  let stream;
+  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ flash("Mic permission was denied"); return; }
+  micChunks=[]; micRec=new MediaRecorder(stream,{mimeType:mime});
+  micRec.ondataavailable=e=>{ if(e.data && e.data.size) micChunks.push(e.data); };
+  micRec.onstop=async ()=>{
+    stream.getTracks().forEach(t=>t.stop());
+    btn.classList.remove("on"); btn.textContent="● Record";
+    const ext=mime.indexOf("mp4")>=0?"m4a":"webm";
+    const file=new File([new Blob(micChunks,{type:mime})], "Mic "+(++micN)+"."+ext, {type:mime});
+    await addUserSound(file);   // validates + adds + saves it, same as a loaded file
+  };
+  micRec.start();
+  btn.classList.add("on"); btn.textContent="■ Stop";
+  flash("Recording… tap Stop. Headphones help avoid feedback.");
+}
 
 // ---- waveform region picker: see the sound, choose the part that loops ----
 const REGION={}; // instKey -> {s,e} fractions of the sample
