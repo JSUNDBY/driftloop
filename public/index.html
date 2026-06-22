@@ -277,24 +277,28 @@ function idbPut(rec){ return idbOpen().then(db=>new Promise((res,rej)=>{ const t
 function idbAll(){ return idbOpen().then(db=>new Promise(res=>{ const rq=db.transaction("sounds","readonly").objectStore("sounds").getAll(); rq.onsuccess=()=>res(rq.result||[]); rq.onerror=()=>res([]); })).catch(()=>[]); }
 function idbDel(id){ return idbOpen().then(db=>new Promise(res=>{ const tx=db.transaction("sounds","readwrite"); tx.objectStore("sounds").delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>res(); })).catch(()=>{}); }
 
-// ONE reused AudioContext for all decoding/waveforms. iOS caps the number of
-// audio contexts a page may create and doesn't free them on refresh, so making a
-// throwaway context per load/record used to jam after a couple of sounds.
-let _decAC=null;
-function decAC(){ if(!_decAC){ const A=window.AudioContext||window.webkitAudioContext; _decAC=new A(); } return _decAC; }
+// ONE AudioContext for the WHOLE app (playback + decoding). iOS caps how many
+// audio contexts a page may create and does NOT free them on refresh (only on tab
+// close), so creating a new one per play/load/record jammed after a few uses.
+let ac=null;
+function audioContext(){ if(!ac){ const A=window.AudioContext||window.webkitAudioContext; ac=new A(); try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} } return ac; }
+function decAC(){ return audioContext(); }
 function canDecode(bytes){ // validate a file before adding it
   try{ return decAC().decodeAudioData(bytes.slice(0)).then(()=>true,()=>false); }
   catch(e){ return Promise.resolve(false); }
 }
 async function addUserSound(file){
-  const bytes=await file.arrayBuffer();
-  if(!(await canDecode(bytes))){ flash("Couldn't read "+file.name); return; }
-  const id="u_"+Date.now()+"_"+Math.floor(Math.random()*1e4);
-  const name=file.name.replace(/\.[^.]+$/,"").slice(0,16);
-  instBytes[id]=bytes; INSTRUMENTS[id]={ name, user:true };
-  idbPut({ id, name, bytes });
-  renderInstruments(); setInstrument(id);
-  flash("Loaded "+name);
+  try{
+    const bytes=await file.arrayBuffer();
+    if(!bytes||!bytes.byteLength){ flash("That file was empty"); return; }
+    if(!(await canDecode(bytes))){ flash("Couldn't read audio from "+(file.name||"that file")); return; }
+    const id="u_"+Date.now()+"_"+Math.floor(Math.random()*1e4);
+    const name=(file.name||"sound").replace(/\.[^.]+$/,"").slice(0,16);
+    instBytes[id]=bytes; INSTRUMENTS[id]={ name, user:true };
+    idbPut({ id, name, bytes });
+    renderInstruments(); setInstrument(id);
+    flash("Loaded "+name);
+  }catch(e){ flash("Load failed: "+(e&&e.message||e)); }
 }
 async function removeUserSound(id){
   delete INSTRUMENTS[id]; delete instBytes[id]; idbDel(id);
@@ -326,9 +330,9 @@ function makeModule(key){
 }
 
 function build(){
-  const AC=window.AudioContext||window.webkitAudioContext;
-  ctx=new AC();
-  try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){}
+  ctx=audioContext();                              // reuse the one context (iOS-safe)
+  try{ ctx.resume(); }catch(e){}
+  if(master){ try{ master.disconnect(); }catch(e){} }  // drop the previous play's graph
   makeNoise();
 
   master=ctx.createGain(); master.gain.value=0.0001;
@@ -525,10 +529,9 @@ function stop(){
   if(tideTimer){ clearInterval(tideTimer); tideTimer=null; }
   if(recorder && recorder.state==="recording"){ try{ recorder.stop(); }catch(e){} }
   orb.textContent="Begin"; orb.classList.remove("live"); mixerOpen.classList.remove("show"); closeMixer();
-  if(!ctx) return;
-  const c=ctx,t=ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0.0001,t+2);
-  setTimeout(()=>{ try{ c.close(); }catch(e){} },2200);
-  ctx=null; bowlBuf=null;
+  if(!ctx||!master) return;
+  const t=ctx.currentTime; master.gain.cancelScheduledValues(t); master.gain.setValueAtTime(master.gain.value,t); master.gain.linearRampToValueAtTime(0.0001,t+2);
+  // keep the AudioContext alive and reuse it next time — never close (iOS-safe)
 }
 
 // ---- recording ----
@@ -592,26 +595,34 @@ window.addEventListener("drop",e=>{ const fs=[...(e.dataTransfer?e.dataTransfer.
 function flash(msg){ const f=document.querySelector(".foot"); if(!f) return; const prev=f.textContent; f.textContent=msg; clearTimeout(flash._t); flash._t=setTimeout(()=>{ f.textContent=prev; },2600); }
 
 // record a loop straight from the phone (or computer) mic -> becomes a tape-looped instrument
-let micRec=null, micChunks=[], micN=0;
+let micRec=null, micStream=null, micChunks=[], micN=0;
+function stopMicStream(){ if(micStream){ try{ micStream.getTracks().forEach(t=>t.stop()); }catch(e){} micStream=null; } }
 async function recordMic(btn){
-  if(micRec && micRec.state==="recording"){ micRec.stop(); return; }
-  if(!navigator.mediaDevices || !window.MediaRecorder){ flash("Recording isn't supported on this browser"); return; }
-  const mime=pickMime(); if(!mime){ flash("Recording isn't supported here"); return; }
-  let stream;
-  try{ stream=await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ flash("Mic permission was denied"); return; }
-  micChunks=[]; micRec=new MediaRecorder(stream,{mimeType:mime});
+  if(micRec && micRec.state==="recording"){ try{ micRec.stop(); }catch(e){} return; }   // tap again = stop
+  function reset(){ stopMicStream(); btn.classList.remove("on"); btn.textContent="● Record"; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ flash("This browser can't reach the mic"); return; }
+  if(!window.MediaRecorder){ flash("This browser can't record audio"); return; }
+  try{ micStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+  catch(e){ flash("Mic blocked: "+((e&&e.name)||e)); return; }
+  const mime=pickMime();
+  try{ micRec = mime ? new MediaRecorder(micStream,{mimeType:mime}) : new MediaRecorder(micStream); }
+  catch(e){ try{ micRec=new MediaRecorder(micStream); }catch(e2){ reset(); flash("Can't record here: "+((e2&&e2.name)||e2)); return; } }
+  const usedMime=micRec.mimeType||mime||"audio/mp4";
+  micChunks=[];
   micRec.ondataavailable=e=>{ if(e.data && e.data.size) micChunks.push(e.data); };
+  micRec.onerror=()=>{ reset(); flash("Recording error — try again"); };
   micRec.onstop=async ()=>{
-    stream.getTracks().forEach(t=>t.stop());
-    btn.classList.remove("on"); btn.textContent="● Record";
-    const ext=mime.indexOf("mp4")>=0?"m4a":"webm";
-    const file=new File([new Blob(micChunks,{type:mime})], "Mic "+(++micN)+"."+ext, {type:mime});
-    await addUserSound(file);   // validates + adds + saves it, same as a loaded file
+    reset();
+    try{
+      if(!micChunks.length){ flash("Nothing recorded — try again"); return; }
+      const ext=usedMime.indexOf("mp4")>=0?"m4a":(usedMime.indexOf("ogg")>=0?"ogg":"webm");
+      const file=new File([new Blob(micChunks,{type:usedMime})], "Mic "+(++micN)+"."+ext, {type:usedMime});
+      await addUserSound(file);
+    }catch(e){ flash("Save failed: "+((e&&e.message)||e)); }
   };
-  micRec.start();
+  try{ micRec.start(); }catch(e){ reset(); flash("Couldn't start: "+((e&&e.name)||e)); return; }
   btn.classList.add("on"); btn.textContent="■ Stop";
-  flash("Recording… tap Stop. Headphones help avoid feedback.");
+  flash("Recording… tap Stop. (Headphones avoid feedback.)");
 }
 
 // ---- waveform region picker: see the sound, choose the part that loops ----
