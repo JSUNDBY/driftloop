@@ -82,6 +82,12 @@
   .btn.on{ color:#04100c; background:var(--accent); border-color:var(--accent); }
   @media (max-width:560px){ .lane{ grid-template-columns:42px 80px 1fr; } .lane .knobs{ grid-column:1/-1; margin-top:2px; } .globals{ grid-template-columns:repeat(2,1fr); } }
 </style>
+<link rel="manifest" href="/station.webmanifest" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Tape Station" />
+<script>if("serviceWorker" in navigator){ addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{})); }</script>
 </head>
 <body>
 <div class="shell">
@@ -107,6 +113,7 @@
     <button class="btn" id="outBtn">OUT → DEFAULT</button>
     <button class="btn" id="midiBtn">MIDI</button>
     <button class="btn" id="shareBtn">Share</button>
+    <button class="btn" id="galleryBtn">Gallery</button>
     <button class="btn" id="randomize">Randomize</button>
     <button class="btn rec" id="rec">Record</button>
   </div>
@@ -353,6 +360,32 @@ frame();
   if(mbn) mbn.onclick=async ()=>{ if(!midiReady){ midiReady=true; if(window.LoopMIDI) await LoopMIDI.init({ onCC:applyMIDI, onStatus:s=>{ if(footEl) footEl.textContent=s; } }); }
     learnMode=!learnMode; mbn.classList.toggle("on",learnMode); if(footEl) footEl.textContent=learnMode?"MIDI learn: touch a knob, then move a hardware control":"MIDI on"; };
   document.addEventListener("pointerdown",e=>{ if(!learnMode||!window.LoopMIDI) return; const el=e.target.closest('input[type=range]'); if(!el) return; const t=targetOf(el); if(!t) return; LoopMIDI.learn(t); if(footEl) footEl.textContent="move a hardware control → "+t; },true);
+
+  // ---- cloud patch gallery (Patch agent's Worker) ----
+  const GAL="https://loopstation-gallery.j-sundby.workers.dev";
+  const esc=s=>String(s).replace(/[<>&]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]));
+  const galWrap=document.createElement("div"); galWrap.id="galleryOverlay";
+  galWrap.style.cssText="position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(4,6,9,0.72);backdrop-filter:blur(6px)";
+  galWrap.innerHTML='<div style="width:min(420px,92vw);max-height:80vh;overflow:auto;background:#0a0d10;border:1px solid var(--line);border-radius:14px;padding:18px">'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b style="font-family:&quot;Space Mono&quot;,monospace;letter-spacing:2px;color:var(--dim);font-size:12px">GALLERY</b><button id="galPub" class="btn">Publish this rig</button></div>'
+    +'<div id="galList" style="display:flex;flex-direction:column;gap:7px"></div>'
+    +'<div style="text-align:center;margin-top:12px"><button id="galClose" class="btn">Close</button></div></div>';
+  document.body.appendChild(galWrap);
+  galWrap.addEventListener("click",e=>{ if(e.target===galWrap) galWrap.style.display="none"; });
+  function renderGallery(items){ const L=document.getElementById("galList"); L.innerHTML="";
+    if(!items||!items.length){ L.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center;padding:10px">No rigs yet — publish one.</div>'; return; }
+    items.forEach(it=>{ const b=document.createElement("button"); b.className="btn"; b.style.textAlign="left";
+      b.innerHTML='<span style="color:var(--ink)">'+esc(it.name||"untitled")+'</span> <span style="color:var(--dim)">· '+esc(it.author||"anon")+'</span>';
+      b.onclick=async ()=>{ try{ const p=await (await fetch(GAL+"/api/patch/"+it.id)).json(); if(p&&p.data){ applyState(p.data); galWrap.style.display="none"; if(footEl) footEl.textContent="loaded: "+(p.name||"rig"); } }catch(e){ if(footEl) footEl.textContent="couldn't load that rig"; } };
+      L.appendChild(b); }); }
+  async function openGallery(){ galWrap.style.display="flex"; const L=document.getElementById("galList"); L.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center">loading…</div>';
+    try{ const j=await (await fetch(GAL+"/api/gallery?limit=40")).json(); renderGallery(j.patches); }catch(e){ L.innerHTML='<div style="color:var(--dim);font-size:12px;text-align:center">gallery offline</div>'; } }
+  async function publish(){ const name=prompt("Name this rig:"); if(!name) return; const author=prompt("Your name / handle:","anon")||"anon";
+    try{ const j=await (await fetch(GAL+"/api/patch",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.slice(0,60),author:author.slice(0,60),data:serializeState()})})).json();
+      if(j&&j.id){ if(footEl) footEl.textContent="published: "+name; openGallery(); } else if(footEl) footEl.textContent="publish failed"; }catch(e){ if(footEl) footEl.textContent="publish failed"; } }
+  const gbn=$("galleryBtn"); if(gbn) gbn.onclick=openGallery;
+  document.getElementById("galPub").onclick=publish;
+  document.getElementById("galClose").onclick=()=>{ galWrap.style.display="none"; };
 })();
 </script>
 </body>
