@@ -45,7 +45,7 @@
 
   /* lane strips */
   .lanes{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
-  .lane{ display:grid; grid-template-columns:42px 92px 1fr 132px; gap:10px; align-items:center;
+  .lane{ display:grid; grid-template-columns:42px 110px 1fr; gap:10px; align-items:center;
     border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:9px 11px; transition:border-color .2s, opacity .2s; }
   .lane.off{ opacity:0.5; }
   .lane .id{ display:flex; flex-direction:column; align-items:center; gap:4px; }
@@ -62,11 +62,11 @@
   .src .ld:hover{ color:var(--warm); border-color:rgba(224,166,75,0.4); }
   .tape{ height:40px; border:1px solid var(--line); border-radius:6px; background:#05080a; overflow:hidden; position:relative; }
   .tape canvas{ display:block; width:100%; height:100%; }
-  .knobs{ display:grid; grid-template-columns:1fr 1fr; gap:4px 9px; }
-  .knob{ display:flex; align-items:center; gap:6px; }
-  .knob label{ font-family:"Space Mono",monospace; font-size:8.5px; letter-spacing:1px; color:var(--dim); flex:0 0 26px; }
-  .knob input{ flex:1; }
-  .knob .v{ font-family:"Space Mono",monospace; font-size:8.5px; color:var(--accent); flex:0 0 30px; text-align:right; }
+  .knobs{ grid-column:1/-1; display:grid; grid-template-columns:repeat(4,1fr); gap:6px 20px; margin-top:8px; padding-top:9px; border-top:1px solid var(--line); }
+  .knob{ display:flex; align-items:center; gap:8px; min-width:0; }
+  .knob label{ font-family:"Space Mono",monospace; font-size:9px; letter-spacing:0.5px; color:var(--dim); flex:0 0 46px; }
+  .knob input{ flex:1; min-width:40px; }
+  .knob .v{ font-family:"Space Mono",monospace; font-size:9.5px; color:var(--accent); flex:0 0 34px; text-align:right; }
 
   input[type=range]{ -webkit-appearance:none; appearance:none; height:2px; border-radius:2px; background:var(--line); outline:none; cursor:pointer; }
   input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); cursor:pointer; }
@@ -80,7 +80,7 @@
   .btn.rec{ color:var(--red); border-color:rgba(229,104,90,0.4); }
   .btn.rec.armed{ background:rgba(229,104,90,0.16); color:#ffd9d2; }
   .btn.on{ color:#04100c; background:var(--accent); border-color:var(--accent); }
-  @media (max-width:560px){ .lane{ grid-template-columns:42px 80px 1fr; } .lane .knobs{ grid-column:1/-1; margin-top:2px; } .globals{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:560px){ .lane{ grid-template-columns:42px 80px 1fr; } .lane .knobs{ grid-template-columns:1fr 1fr; } .globals{ grid-template-columns:repeat(2,1fr); } }
 </style>
 <link rel="manifest" href="/station.webmanifest" />
 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -242,10 +242,10 @@ for(let i=0;i<NL;i++){
     '<div class="src"><select data-src="'+i+'">'+SRC_ORDER.map(k=>'<option value="'+k+'"'+(k===L.src?' selected':'')+'>'+SRC_NAME[k]+'</option>').join("")+'</select><button class="ld" data-ld="'+i+'">LOAD</button></div>'+
     '<div class="tape"><canvas data-cv="'+i+'" width="320" height="80"></canvas></div>'+
     '<div class="knobs">'+
-      '<div class="knob"><label>PIT</label><input type="range" min="-24" max="24" step="1" value="'+L.pitch+'" data-p="pitch" data-i="'+i+'"><span class="v" data-rv="pitch'+i+'">'+(L.pitch>0?"+":"")+L.pitch+'st</span></div>'+
-      '<div class="knob"><label>LVL</label><input type="range" min="0" max="1" step="0.01" value="'+L.level+'" data-p="level" data-i="'+i+'"><span class="v" data-rv="level'+i+'">'+Math.round(L.level*100)+'</span></div>'+
-      '<div class="knob"><label>TON</label><input type="range" min="0" max="1" step="0.01" value="'+L.tone+'" data-p="tone" data-i="'+i+'"><span class="v" data-rv="tone'+i+'">'+Math.round(L.tone*100)+'</span></div>'+
-      '<div class="knob"><label>LEN</label><input type="range" min="0" max="1" step="0.01" value="'+L.len+'" data-p="len" data-i="'+i+'"><span class="v" data-rv="len'+i+'">'+Math.round(L.len*100)+'</span></div>'+
+      '<div class="knob" title="Pitch — how high or low this loop plays (semitones)"><label>PITCH</label><input type="range" min="-24" max="24" step="1" value="'+L.pitch+'" data-p="pitch" data-i="'+i+'"><span class="v" data-rv="pitch'+i+'">'+(L.pitch>0?"+":"")+L.pitch+'st</span></div>'+
+      '<div class="knob" title="Level — this loop\'s volume in the mix"><label>LEVEL</label><input type="range" min="0" max="1" step="0.01" value="'+L.level+'" data-p="level" data-i="'+i+'"><span class="v" data-rv="level'+i+'">'+Math.round(L.level*100)+'</span></div>'+
+      '<div class="knob" title="Tone — dark/warm (low) to bright/crisp (high)"><label>TONE</label><input type="range" min="0" max="1" step="0.01" value="'+L.tone+'" data-p="tone" data-i="'+i+'"><span class="v" data-rv="tone'+i+'">'+Math.round(L.tone*100)+'</span></div>'+
+      '<div class="knob" title="Length — short = tight stutter, long = the whole phrase"><label>LOOP</label><input type="range" min="0" max="1" step="0.01" value="'+L.len+'" data-p="len" data-i="'+i+'"><span class="v" data-rv="len'+i+'">'+Math.round(L.len*100)+'</span></div>'+
     '</div>';
   lanesEl.appendChild(el); L.cv=el.querySelector("canvas");
 }
