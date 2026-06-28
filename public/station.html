@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Driftloop — Tape Station</title>
+<meta name="theme-color" content="#070809" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Jost:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{ --bg:#070809; --panel:#0c0e10; --ink:#dfe6e6; --dim:rgba(223,230,230,0.45); --accent:#6fd6c0; --warm:#e0a64b; --red:#e5685a; --line:rgba(223,230,230,0.1); }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; min-height:100%; background:
+    radial-gradient(1200px 600px at 50% -10%, rgba(111,214,192,0.06), transparent 60%), var(--bg); }
+  body{ font-family:"Jost",sans-serif; color:var(--ink); overscroll-behavior:none; padding:0 0 28px; }
+  .mono{ font-family:"Space Mono",monospace; }
+  .shell{ max-width:760px; margin:0 auto; padding:calc(env(safe-area-inset-top,0px) + 16px) 14px 0; }
+
+  /* header / transport */
+  .head{ display:flex; align-items:center; gap:12px; border:1px solid var(--line); border-radius:12px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.025), rgba(255,255,255,0)); padding:12px 14px; }
+  .brand{ display:flex; flex-direction:column; gap:1px; }
+  .brand .t{ font-family:"Space Mono",monospace; font-weight:700; letter-spacing:1.5px; font-size:14px; }
+  .brand .s{ font-size:10px; letter-spacing:3px; text-transform:uppercase; color:var(--dim); }
+  .reels{ display:flex; gap:6px; margin-left:2px; }
+  .reel{ width:22px; height:22px; border-radius:50%; border:1.5px solid rgba(223,230,230,0.25); position:relative; }
+  .reel::before,.reel::after{ content:""; position:absolute; inset:8px; border-radius:50%; border:1px solid rgba(223,230,230,0.2); }
+  .reel.spin{ animation:spin 2.4s linear infinite; border-color:rgba(111,214,192,0.5); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .transport{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+  .play{ font-family:"Space Mono",monospace; font-weight:700; letter-spacing:1.5px; font-size:12px; color:#071012;
+    background:var(--accent); border:none; border-radius:8px; padding:10px 18px; cursor:pointer; transition:.2s; }
+  .play:hover{ filter:brightness(1.08); }
+  .play.live{ background:var(--red); color:#1a0807; }
+  .vu{ width:90px; height:26px; border:1px solid var(--line); border-radius:6px; background:#05080a; overflow:hidden; }
+  .vu canvas{ display:block; width:100%; height:100%; }
+
+  /* global tape controls */
+  .globals{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:10px 0; }
+  .gctl{ border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:9px 11px; }
+  .gctl .k{ font-family:"Space Mono",monospace; font-size:9.5px; letter-spacing:2px; text-transform:uppercase; color:var(--dim); display:flex; justify-content:space-between; }
+  .gctl .k b{ color:var(--accent); font-weight:400; }
+  .gctl input{ width:100%; margin-top:7px; }
+
+  /* lane strips */
+  .lanes{ display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+  .lane{ display:grid; grid-template-columns:42px 92px 1fr 132px; gap:10px; align-items:center;
+    border:1px solid var(--line); border-radius:10px; background:var(--panel); padding:9px 11px; transition:border-color .2s, opacity .2s; }
+  .lane.off{ opacity:0.5; }
+  .lane .id{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .lane .id .n{ font-family:"Space Mono",monospace; font-size:10px; letter-spacing:1px; color:var(--dim); }
+  .led{ width:11px; height:11px; border-radius:50%; border:1px solid rgba(223,230,230,0.3); background:transparent; cursor:pointer; padding:0; }
+  .led.on{ background:var(--accent); border-color:var(--accent); box-shadow:0 0 8px rgba(111,214,192,0.7); }
+  .ms{ display:flex; gap:3px; }
+  .msbtn{ font-family:"Space Mono",monospace; font-size:8px; width:16px; height:15px; border:1px solid var(--line); border-radius:3px; background:transparent; color:var(--dim); cursor:pointer; padding:0; }
+  .msbtn.mute.on{ background:var(--red); border-color:var(--red); color:#1a0807; }
+  .msbtn.solo.on{ background:var(--warm); border-color:var(--warm); color:#100c08; }
+  .src{ display:flex; flex-direction:column; gap:5px; }
+  .src select{ font-family:"Space Mono",monospace; font-size:11px; color:var(--ink); background:#05080a; border:1px solid var(--line); border-radius:6px; padding:5px 6px; cursor:pointer; width:100%; }
+  .src .ld{ font-family:"Space Mono",monospace; font-size:9px; letter-spacing:1px; color:var(--dim); background:transparent; border:1px solid var(--line); border-radius:5px; padding:3px; cursor:pointer; }
+  .src .ld:hover{ color:var(--warm); border-color:rgba(224,166,75,0.4); }
+  .tape{ height:40px; border:1px solid var(--line); border-radius:6px; background:#05080a; overflow:hidden; position:relative; }
+  .tape canvas{ display:block; width:100%; height:100%; }
+  .knobs{ display:grid; grid-template-columns:1fr 1fr; gap:4px 9px; }
+  .knob{ display:flex; align-items:center; gap:6px; }
+  .knob label{ font-family:"Space Mono",monospace; font-size:8.5px; letter-spacing:1px; color:var(--dim); flex:0 0 26px; }
+  .knob input{ flex:1; }
+  .knob .v{ font-family:"Space Mono",monospace; font-size:8.5px; color:var(--accent); flex:0 0 30px; text-align:right; }
+
+  input[type=range]{ -webkit-appearance:none; appearance:none; height:2px; border-radius:2px; background:var(--line); outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); cursor:pointer; }
+  input[type=range]::-moz-range-thumb{ width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--bg); cursor:pointer; }
+
+  .foot{ font-family:"Space Mono",monospace; font-size:10px; letter-spacing:1px; color:rgba(223,230,230,0.3); text-align:center; margin-top:16px; }
+  .actions{ display:flex; gap:8px; justify-content:center; margin-top:12px; }
+  .btn{ font-family:"Space Mono",monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--dim);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 16px; cursor:pointer; }
+  .btn:hover{ color:var(--ink); border-color:rgba(111,214,192,0.5); }
+  .btn.rec{ color:var(--red); border-color:rgba(229,104,90,0.4); }
+  .btn.rec.armed{ background:rgba(229,104,90,0.16); color:#ffd9d2; }
+  .btn.on{ color:#04100c; background:var(--accent); border-color:var(--accent); }
+  @media (max-width:560px){ .lane{ grid-template-columns:42px 80px 1fr; } .lane .knobs{ grid-column:1/-1; margin-top:2px; } .globals{ grid-template-columns:repeat(2,1fr); } }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="head">
+    <div class="reels"><div class="reel" id="reelA"></div><div class="reel" id="reelB"></div></div>
+    <div class="brand"><span class="t">DRIFTLOOP</span><span class="s">tape station</span></div>
+    <div class="transport">
+      <div class="vu"><canvas id="vu" width="180" height="52"></canvas></div>
+      <button class="play" id="play">PLAY</button>
+    </div>
+  </div>
+
+  <div class="globals">
+    <div class="gctl"><div class="k"><span>Space</span><b id="vSpace">62</b></div><input id="space" type="range" min="0" max="1" step="0.01" value="0.62"></div>
+    <div class="gctl"><div class="k"><span>Age</span><b id="vAge">0</b></div><input id="age" type="range" min="0" max="1" step="0.01" value="0"></div>
+    <div class="gctl"><div class="k"><span>Wow</span><b id="vWow">35</b></div><input id="wow" type="range" min="0" max="1" step="0.01" value="0.35"></div>
+    <div class="gctl"><div class="k"><span>Master</span><b id="vVol">80</b></div><input id="vol" type="range" min="0" max="1" step="0.01" value="0.8"></div>
+  </div>
+
+  <div class="lanes" id="lanes"></div>
+
+  <div class="actions">
+    <button class="btn" id="outBtn">OUT → DEFAULT</button>
+    <button class="btn" id="midiBtn">MIDI</button>
+    <button class="btn" id="shareBtn">Share</button>
+    <button class="btn" id="randomize">Randomize</button>
+    <button class="btn rec" id="rec">Record</button>
+  </div>
+  <p class="foot" id="foot">6 loops · headphones up · press PLAY</p>
+</div>
+
+<script src="midi.js"></script>
+<script src="patch.js"></script>
+<script>
+"use strict";
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const NL=6;
+
+// ---- source bank (synth buffers built in JS + the two bundled samples) ----
+const SRC_ORDER=["sine","pad","glass","air","sub","drone","bowl","cathedral"];
+const SRC_NAME={ sine:"SINE", pad:"PAD", glass:"GLASS", air:"AIR", sub:"SUB", drone:"DRONE", bowl:"BOWL", cathedral:"CATHEDRL" };
+const sources={};          // key -> AudioBuffer
+const sampleBytes={};      // bowl/cathedral fetched bytes
+["bowl","cathedral"].forEach(k=>{ fetch(k+".mp3").then(r=>r.ok?r.arrayBuffer():null).then(b=>sampleBytes[k]=b).catch(()=>{}); });
+
+let ac=null, master, comp, analyser, ageLP, hissGain, reverb, reverbSend, reverbReturn, wowOut;
+let playing=false, sinkId="", sinkLabel="DEFAULT";
+const lanes=[];  // {on,src,pitch,level,tone,pan, nodes, an, cv, peaks, ph}
+const P={ space:0.62, age:0, wow:0.35, vol:0.8 };
+
+function audioContext(){ if(!ac){ const A=window.AudioContext||window.webkitAudioContext; ac=new A(); try{ if(navigator.audioSession) navigator.audioSession.type="playback"; }catch(e){} } return ac; }
+function noiseBuf(sec){ const b=ac.createBuffer(1,Math.floor(ac.sampleRate*sec),ac.sampleRate); const d=b.getChannelData(0); let l=0; for(let i=0;i<d.length;i++){ const w=Math.random()*2-1; l=(l+0.02*w)/1.02; d[i]=l*3; } return b; }
+
+// build synth source buffers (no offline context — iOS-safe)
+function buildSources(){
+  const sr=ac.sampleRate, dur=4.0, N=Math.floor(sr*dur);
+  const mk=fn=>{ const b=ac.createBuffer(1,N,sr); const d=b.getChannelData(0); let pk=0; for(let i=0;i<N;i++){ const t=i/sr; d[i]=fn(t,i); if(Math.abs(d[i])>pk)pk=Math.abs(d[i]); } if(pk>0) for(let i=0;i<N;i++) d[i]/=pk*1.2; return b; };
+  const saw=(f,t)=>2*((t*f)%1)-1;
+  sources.sine = mk(t=>Math.sin(2*Math.PI*mtof(45)*t));
+  sources.sub  = mk(t=>Math.sin(2*Math.PI*mtof(33)*t)+0.2*Math.sin(2*Math.PI*mtof(45)*t));
+  let lp1=0; sources.pad = mk((t)=>{ const v=0.4*saw(mtof(45),t)+0.4*saw(mtof(45)*1.005,t)+0.3*saw(mtof(52),t); lp1=lp1*0.86+v*0.14; return lp1; });
+  sources.glass= mk(t=> 0.5*Math.sin(2*Math.PI*mtof(69)*t)+0.3*Math.sin(2*Math.PI*mtof(69)*2.01*t)+0.2*Math.sin(2*Math.PI*mtof(69)*3.04*t));
+  let lp2=0; sources.air = mk(()=>{ const v=Math.random()*2-1; lp2=lp2*0.92+v*0.08; return lp2; });
+  let lp3=0; sources.drone= mk((t)=>{ const v=0.5*saw(mtof(38),t)+0.3*saw(mtof(38)*0.997,t)+0.2*(Math.random()*2-1); lp3=lp3*0.9+v*0.1; return lp3; });
+}
+async function decodeSamples(){
+  for(const k of ["bowl","cathedral"]){ if(sources[k]) continue; const bytes=sampleBytes[k]; if(!bytes){ continue; }
+    try{ sources[k]=await ac.decodeAudioData(bytes.slice(0)); }catch(e){} }
+}
+
+// ---- graph ----
+function buildGraph(){
+  ac=audioContext(); try{ ac.resume(); }catch(e){}
+  if(sinkId && ac.setSinkId){ ac.setSinkId(sinkId).catch(()=>{}); }   // route to chosen output (e.g. BlackHole -> Ableton)
+  if(master){ try{ master.disconnect(); }catch(e){} }
+  master=ac.createGain(); master.gain.value=P.vol;
+  comp=ac.createDynamicsCompressor(); comp.threshold.value=-16; comp.knee.value=24; comp.ratio.value=2.6; comp.attack.value=0.05; comp.release.value=0.4;
+  analyser=ac.createAnalyser(); analyser.fftSize=1024; analyser.smoothingTimeConstant=0.8;
+  ageLP=ac.createBiquadFilter(); ageLP.type="lowpass"; ageLP.frequency.value=16000; ageLP.Q.value=0.4;
+  ageLP.connect(comp); comp.connect(master); master.connect(analyser); analyser.connect(ac.destination);
+  try{ streamDest=ac.createMediaStreamDestination(); master.connect(streamDest); }catch(e){ streamDest=null; }
+  // reverb
+  reverbReturn=ac.createGain(); reverbReturn.gain.value=P.space; reverbReturn.connect(ageLP);
+  reverb=ac.createConvolver(); reverb.buffer=makeIR(7,3); reverb.connect(reverbReturn);
+  reverbSend=ac.createGain(); reverbSend.gain.value=1; reverbSend.connect(reverb);
+  // age hiss
+  const hs=ac.createBufferSource(); hs.buffer=noiseBuf(2); hs.loop=true; const hp=ac.createBiquadFilter(); hp.type="highpass"; hp.frequency.value=1500;
+  hissGain=ac.createGain(); hissGain.gain.value=0; hs.connect(hp); hp.connect(hissGain); hissGain.connect(ageLP); hs.start();
+  // wow + flutter
+  wowOut=ac.createGain(); const wo=ac.createOscillator(); wo.frequency.value=0.09; const wg=ac.createGain(); wg.gain.value=6; wo.connect(wg); wg.connect(wowOut); wo.start();
+  const fl=ac.createOscillator(); fl.frequency.value=5.2; const fg=ac.createGain(); fg.gain.value=1.6; fl.connect(fg); fg.connect(wowOut); fl.start();
+}
+function makeIR(sec,decay){ const len=Math.floor(ac.sampleRate*sec), b=ac.createBuffer(2,len,ac.sampleRate);
+  for(let ch=0;ch<2;ch++){ const d=b.getChannelData(ch); let lp=0; for(let i=0;i<len;i++){ const e=Math.pow(1-i/len,decay); const w=(Math.random()*2-1)*e; lp=lp*0.72+w*0.28; d[i]=lp; } } return b; }
+let streamDest=null, recorder=null, recChunks=[];
+
+function applyGlobals(){ if(!ac) return; const t=ac.currentTime;
+  master.gain.setTargetAtTime(P.vol,t,0.1); reverbReturn.gain.setTargetAtTime(P.space,t,0.2);
+  ageLP.frequency.setTargetAtTime(16000-P.age*14000,t,0.3); hissGain.gain.setTargetAtTime(P.age*0.02,t,0.4);
+  // wow depth
+  if(wowOut) wowOut.gain.setTargetAtTime(0.6+P.wow*1.2,t,0.3);
+}
+
+// ---- lanes ----
+function startLane(i){ const L=lanes[i]; if(!ac||!L.on||!sources[L.src]) return; stopLaneNodes(i);
+  const buf=sources[L.src]; const src=ac.createBufferSource(); src.buffer=buf; src.loop=true;
+  const margin=0.05, span=Math.max(0.2, buf.duration*(0.4+0.6*L.len)); src.loopStart=margin; src.loopEnd=Math.min(buf.duration-0.02, margin+span);
+  src.playbackRate.value=Math.pow(2,L.pitch/12); wowOut.connect(src.detune);
+  const lp=ac.createBiquadFilter(); lp.type="lowpass"; lp.frequency.value=400+L.tone*8000; lp.Q.value=0.5;
+  const g=ac.createGain(); g.gain.value=0; const pan=ac.createStereoPanner?ac.createStereoPanner():null;
+  const an=ac.createAnalyser(); an.fftSize=256;
+  src.connect(lp); lp.connect(g); g.connect(an);
+  if(pan){ an.connect(pan); pan.pan.value=L.pan; pan.connect(ageLP); const rs=ac.createGain(); rs.gain.value=0.85; pan.connect(rs); rs.connect(reverbSend); }
+  else { an.connect(ageLP); const rs=ac.createGain(); rs.gain.value=0.85; an.connect(rs); rs.connect(reverbSend); }
+  src.start(); g.gain.linearRampToValueAtTime(effLevel(L), ac.currentTime+0.4);
+  L.nodes={src,lp,g,pan}; L.an=an; L.tdata=new Uint8Array(an.fftSize);
+}
+function effLevel(L){ const anySolo=lanes.some(x=>x.solo); return (L.muted || (anySolo && !L.solo)) ? 0 : L.level; }
+function updateAllLevels(){ if(!ac) return; for(let i=0;i<NL;i++) if(lanes[i].nodes) lanes[i].nodes.g.gain.setTargetAtTime(lanes[i].on?effLevel(lanes[i]):0, ac.currentTime, 0.08); }
+function stopLaneNodes(i){ const L=lanes[i]; if(L.nodes){ try{ const g=L.nodes.g, t=ac.currentTime; g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0,t,0.15); const s=L.nodes.src; setTimeout(()=>{ try{s.stop();}catch(e){} },400); }catch(e){} L.nodes=null; L.an=null; } }
+function updateLaneLive(i){ const L=lanes[i]; if(!L.nodes) return; const t=ac.currentTime;
+  L.nodes.g.gain.setTargetAtTime(L.on?effLevel(L):0,t,0.1); L.nodes.lp.frequency.setTargetAtTime(400+L.tone*8000,t,0.1); if(L.nodes.pan) L.nodes.pan.pan.setTargetAtTime(L.pan,t,0.1); }
+
+function startAll(){ for(let i=0;i<NL;i++) if(lanes[i].on) startLane(i); }
+function stopAll(){ for(let i=0;i<NL;i++) stopLaneNodes(i); }
+
+// ---- transport ----
+async function play(){
+  if(playing) return; buildGraph(); buildSources(); await decodeSamples();
+  // default loop region peaks for sample sources are now drawable
+  applyGlobals(); startAll();
+  playing=true; document.getElementById("play").textContent="STOP"; document.getElementById("play").classList.add("live");
+  document.getElementById("reelA").classList.add("spin"); document.getElementById("reelB").classList.add("spin");
+  drawPeaksAll();
+}
+function stop(){ playing=false; stopAll(); if(recorder&&recorder.state==="recording"){ try{recorder.stop();}catch(e){} }
+  document.getElementById("play").textContent="PLAY"; document.getElementById("play").classList.remove("live");
+  document.getElementById("reelA").classList.remove("spin"); document.getElementById("reelB").classList.remove("spin");
+  if(ac&&master){ const t=ac.currentTime; master.gain.setTargetAtTime(0.0001,t,0.2); } }
+
+// ---- build the console UI ----
+const lanesEl=document.getElementById("lanes");
+const DEFAULTS=[ {src:"bowl",pitch:0,on:true}, {src:"bowl",pitch:7,on:true}, {src:"pad",pitch:0,on:true},
+  {src:"glass",pitch:12,on:false}, {src:"sub",pitch:0,on:true}, {src:"air",pitch:0,on:false} ];
+for(let i=0;i<NL;i++){
+  const d=DEFAULTS[i]; const L={ on:d.on, src:d.src, pitch:d.pitch, level:0.55, tone:0.6, pan:(i%2?0.3:-0.3)*((i>>1)%2?1:0.5), len:0.5, muted:false, solo:false, nodes:null, an:null }; lanes.push(L);
+  const el=document.createElement("div"); el.className="lane"+(L.on?"":" off"); el.dataset.i=i;
+  el.innerHTML=
+    '<div class="id"><button class="led'+(L.on?' on':'')+'" data-led="'+i+'"></button><span class="n">LP'+String(i+1).padStart(2,"0")+'</span><div class="ms"><button class="msbtn mute" data-mute="'+i+'">M</button><button class="msbtn solo" data-solo="'+i+'">S</button></div></div>'+
+    '<div class="src"><select data-src="'+i+'">'+SRC_ORDER.map(k=>'<option value="'+k+'"'+(k===L.src?' selected':'')+'>'+SRC_NAME[k]+'</option>').join("")+'</select><button class="ld" data-ld="'+i+'">LOAD</button></div>'+
+    '<div class="tape"><canvas data-cv="'+i+'" width="320" height="80"></canvas></div>'+
+    '<div class="knobs">'+
+      '<div class="knob"><label>PIT</label><input type="range" min="-24" max="24" step="1" value="'+L.pitch+'" data-p="pitch" data-i="'+i+'"><span class="v" data-rv="pitch'+i+'">'+(L.pitch>0?"+":"")+L.pitch+'st</span></div>'+
+      '<div class="knob"><label>LVL</label><input type="range" min="0" max="1" step="0.01" value="'+L.level+'" data-p="level" data-i="'+i+'"><span class="v" data-rv="level'+i+'">'+Math.round(L.level*100)+'</span></div>'+
+      '<div class="knob"><label>TON</label><input type="range" min="0" max="1" step="0.01" value="'+L.tone+'" data-p="tone" data-i="'+i+'"><span class="v" data-rv="tone'+i+'">'+Math.round(L.tone*100)+'</span></div>'+
+      '<div class="knob"><label>LEN</label><input type="range" min="0" max="1" step="0.01" value="'+L.len+'" data-p="len" data-i="'+i+'"><span class="v" data-rv="len'+i+'">'+Math.round(L.len*100)+'</span></div>'+
+    '</div>';
+  lanesEl.appendChild(el); L.cv=el.querySelector("canvas");
+}
+
+lanesEl.addEventListener("click",e=>{ const led=e.target.closest("[data-led]"); if(led){ const i=+led.dataset.led; const L=lanes[i]; L.on=!L.on;
+  led.classList.toggle("on",L.on); led.closest(".lane").classList.toggle("off",!L.on); if(playing){ if(L.on) startLane(i); else stopLaneNodes(i); } return; }
+  const mb=e.target.closest("[data-mute]"); if(mb){ const i=+mb.dataset.mute; lanes[i].muted=!lanes[i].muted; mb.classList.toggle("on",lanes[i].muted); updateAllLevels(); return; }
+  const sb=e.target.closest("[data-solo]"); if(sb){ const i=+sb.dataset.solo; lanes[i].solo=!lanes[i].solo; sb.classList.toggle("on",lanes[i].solo); updateAllLevels(); return; } });
+lanesEl.addEventListener("change",e=>{ const s=e.target.closest("[data-src]"); if(s){ const i=+s.dataset.src; lanes[i].src=s.value; if(playing&&lanes[i].on) startLane(i); drawPeaks(i); } });
+lanesEl.addEventListener("input",e=>{ const inp=e.target.closest("[data-p]"); if(!inp) return; const i=+inp.dataset.i, p=inp.dataset.p, v=+inp.value; lanes[i][p]=v;
+  const rv=document.querySelector('[data-rv="'+p+i+'"]'); if(rv) rv.textContent = p==="pitch"?((v>0?"+":"")+v+"st") : Math.round(v*100);
+  if(p==="level"||p==="tone"||p==="pan") updateLaneLive(i); else if(playing&&lanes[i].on) startLane(i);
+  if(p==="len") drawPeaks(i); });
+lanesEl.addEventListener("click",e=>{ const ld=e.target.closest("[data-ld]"); if(ld) loadInto(+ld.dataset.ld); });
+
+function loadInto(i){ const inp=document.createElement("input"); inp.type="file"; inp.accept="audio/*,video/*";
+  inp.onchange=async ()=>{ const f=inp.files[0]; if(!f) return; try{ const bytes=await f.arrayBuffer(); buildGraph._dec=buildGraph._dec||audioContext();
+    const buf=await audioContext().decodeAudioData(bytes.slice(0)); const key="u"+i+"_"+Date.now(); sources[key]=buf;
+    const sel=document.querySelector('[data-src="'+i+'"]'); const o=document.createElement("option"); o.value=key; o.textContent=(f.name||"LOADED").replace(/\.[^.]+$/,"").slice(0,8).toUpperCase(); o.selected=true; sel.appendChild(o);
+    lanes[i].src=key; if(playing&&lanes[i].on) startLane(i); drawPeaks(i); document.getElementById("foot").textContent="loaded into LP"+String(i+1).padStart(2,"0");
+  }catch(e){ document.getElementById("foot").textContent="couldn't read that file"; } }; inp.click(); }
+
+// globals wiring
+function gw(id,key,fmt){ const el=document.getElementById(id), out=document.getElementById(fmt.id); el.oninput=()=>{ P[key]=+el.value; out.textContent=fmt.f(+el.value); applyGlobals(); }; }
+gw("space","space",{id:"vSpace",f:v=>Math.round(v*100)}); gw("age","age",{id:"vAge",f:v=>Math.round(v*100)});
+gw("wow","wow",{id:"vWow",f:v=>Math.round(v*100)}); gw("vol","vol",{id:"vVol",f:v=>Math.round(v*100)});
+document.getElementById("play").onclick=()=>{ if(playing) stop(); else play(); };
+// OUTPUT routing — pick the device the app plays through (e.g. BlackHole -> Ableton input)
+async function applySink(){ document.getElementById("outBtn").textContent="OUT → "+sinkLabel.slice(0,12);
+  if(ac && ac.setSinkId){ try{ await ac.setSinkId(sinkId); document.getElementById("foot").textContent="output → "+sinkLabel; }catch(e){ document.getElementById("foot").textContent="couldn't route to that device"; } }
+  else if(ac){ document.getElementById("foot").textContent="output routing needs Chrome 110+"; } }
+let outIdx=-1;
+async function chooseOutput(){ try{
+    if(!(typeof AudioContext!=="undefined" && "setSinkId" in AudioContext.prototype)){ document.getElementById("foot").textContent="output routing needs desktop Chrome 110+"; return; }
+    if(navigator.mediaDevices && navigator.mediaDevices.selectAudioOutput){ const dev=await navigator.mediaDevices.selectAudioOutput(); sinkId=dev.deviceId; sinkLabel=(dev.label||"DEVICE").toUpperCase(); return applySink(); }
+    // fallback: cycle through the output devices
+    let devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="audiooutput");
+    if(devs.length && !devs[0].label){ try{ const s=await navigator.mediaDevices.getUserMedia({audio:true}); s.getTracks().forEach(t=>t.stop()); devs=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==="audiooutput"); }catch(e){} }
+    if(!devs.length){ document.getElementById("foot").textContent="no output devices found"; return; }
+    outIdx=(outIdx+1)%devs.length; const d=devs[outIdx]; sinkId=d.deviceId; sinkLabel=(d.label||("OUTPUT "+(outIdx+1))).toUpperCase(); await applySink();
+  }catch(e){ /* cancelled */ } }
+document.getElementById("outBtn").onclick=chooseOutput;
+document.getElementById("randomize").onclick=()=>{ const scale=[0,3,5,7,10,12]; for(let i=0;i<NL;i++){ const L=lanes[i];
+  L.src=SRC_ORDER[Math.floor(Math.random()*6)]; L.pitch=scale[Math.floor(Math.random()*scale.length)]-12+(Math.random()<0.3?12:0); L.tone=0.4+Math.random()*0.5; L.on=Math.random()<0.7;
+  const el=lanesEl.children[i]; el.classList.toggle("off",!L.on); el.querySelector(".led").classList.toggle("on",L.on); el.querySelector("[data-src]").value=L.src;
+  el.querySelector('[data-p="pitch"]').value=L.pitch; el.querySelector('[data-rv="pitch'+i+'"]').textContent=(L.pitch>0?"+":"")+L.pitch+"st";
+  el.querySelector('[data-p="tone"]').value=L.tone; if(playing){ if(L.on) startLane(i); else stopLaneNodes(i); } drawPeaks(i); } };
+function pickMime(){ for(const o of ["audio/webm;codecs=opus","audio/webm","audio/mp4"]) if(window.MediaRecorder&&MediaRecorder.isTypeSupported(o)) return o; return null; }
+document.getElementById("rec").onclick=function(){ const b=this; if(!playing||!streamDest||!window.MediaRecorder){ document.getElementById("foot").textContent="press play first"; return; }
+  if(recorder&&recorder.state==="recording"){ recorder.stop(); return; } const mime=pickMime(); if(!mime) return;
+  recChunks=[]; recorder=new MediaRecorder(streamDest.stream,{mimeType:mime}); recorder.ondataavailable=e=>{ if(e.data.size) recChunks.push(e.data); };
+  recorder.onstop=()=>{ const blob=new Blob(recChunks,{type:mime}); const u=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=u; a.download="driftloop-station-"+Date.now()+(mime.indexOf("mp4")>=0?".m4a":".webm"); a.click(); b.classList.remove("armed"); b.textContent="Record"; };
+  recorder.start(); b.classList.add("armed"); b.textContent="Stop"; };
+
+// ---- per-lane tape waveform + meter, and the master VU ----
+function computePeaks(buf,n){ const ch=buf.getChannelData(0), out=new Float32Array(n), block=Math.max(1,Math.floor(ch.length/n)); let pk=0;
+  for(let i=0;i<n;i++){ let mx=0,s=i*block; for(let j=0;j<block;j++){ const v=Math.abs(ch[s+j]||0); if(v>mx)mx=v; } out[i]=mx; if(mx>pk)pk=mx; } if(pk>0) for(let i=0;i<n;i++) out[i]/=pk; return out; }
+function drawPeaks(i){ const L=lanes[i]; const buf=sources[L.src]; if(!buf||!L.cv) { return; } L.peaks=computePeaks(buf,160); L.ph=L.ph||0; }
+function drawPeaksAll(){ for(let i=0;i<NL;i++) drawPeaks(i); }
+
+const vu=document.getElementById("vu"), vg=vu.getContext("2d"); let vampL=0,vampR=0, vtd=new Uint8Array(1024);
+function acc(){ return getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()||"#6fd6c0"; }
+function frame(){
+  const col=acc();
+  // master VU
+  vg.clearRect(0,0,vu.width,vu.height);
+  if(analyser){ analyser.getByteTimeDomainData(vtd); let s=0; for(let i=0;i<vtd.length;i++){ const v=(vtd[i]-128)/128; s+=v*v; } const a=Math.sqrt(s/vtd.length); vampL=vampL*0.7+a*0.3; }
+  const segs=14; for(let k=0;k<segs;k++){ const lit=vampL*3.4>k/segs; const x=4+k*(vu.width-8)/segs; const c=k>segs*0.8?"#e5685a":(k>segs*0.6?"#e0a64b":col);
+    vg.fillStyle=lit?c:"rgba(255,255,255,0.08)"; vg.fillRect(x,8,(vu.width-8)/segs-3,vu.height-16); }
+  // per-lane tape
+  for(let i=0;i<NL;i++){ const L=lanes[i]; if(!L.cv) continue; const g=L.cv.getContext("2d"), W=L.cv.width, H=L.cv.height; g.clearRect(0,0,W,H);
+    if(L.peaks){ const on=playing&&L.on; const a=on?0.8:0.25; g.strokeStyle=col+(on?"cc":"55"); g.lineWidth=1; const mid=H/2;
+      g.beginPath(); for(let x=0;x<L.peaks.length;x++){ const px=x/L.peaks.length*W, h=L.peaks[x]*mid*0.9; g.moveTo(px,mid-h); g.lineTo(px,mid+h); } g.stroke();
+      if(on){ L.ph=(L.ph+0.004*Math.pow(2,L.pitch/12))%1; const phx=L.ph*W; g.strokeStyle=acc(); g.lineWidth=2; g.beginPath(); g.moveTo(phx,0); g.lineTo(phx,H); g.stroke(); }
+    }
+    // lane meter (right edge)
+    if(L.an && playing && L.on){ L.an.getByteTimeDomainData(L.tdata); let s=0; for(let k=0;k<L.tdata.length;k++){ const v=(L.tdata[k]-128)/128; s+=v*v; } const m=Math.min(1,Math.sqrt(s/L.tdata.length)*4); g.fillStyle=col; g.fillRect(W-4,H-m*H,3,m*H); }
+  }
+  requestAnimationFrame(frame);
+}
+frame();
+
+// ---- team build: patch save/share (Console) + Web MIDI (Patch), integrated by Director ----
+(function(){
+  const $=id=>document.getElementById(id), q=s=>document.querySelector(s), footEl=$("foot");
+  const setRange=(el,v)=>{ if(!el) return; el.value=v; el.dispatchEvent(new Event("input",{bubbles:true})); };
+  const setSelect=(el,v)=>{ if(!el||v==null) return; el.value=v; el.dispatchEvent(new Event("change",{bubbles:true})); };
+  function serializeState(){ return { v:1, g:{ space:+$("space").value, age:+$("age").value, wow:+$("wow").value, vol:+$("vol").value },
+    lanes: lanes.map(L=>({ s:L.src, p:L.pitch, l:L.level, t:L.tone, n:L.len, on:L.on?1:0, m:L.muted?1:0, so:L.solo?1:0 })) }; }
+  function applyState(st){ if(!st||!st.lanes) return;
+    if(st.g){ setRange($("space"),st.g.space); setRange($("age"),st.g.age); setRange($("wow"),st.g.wow); setRange($("vol"),st.g.vol); }
+    st.lanes.forEach((d,i)=>{ if(i>=NL) return; const L=lanes[i];
+      setSelect(q('[data-src="'+i+'"]'), d.s);
+      setRange(q('[data-p="pitch"][data-i="'+i+'"]'), d.p); setRange(q('[data-p="level"][data-i="'+i+'"]'), d.l);
+      setRange(q('[data-p="tone"][data-i="'+i+'"]'), d.t); setRange(q('[data-p="len"][data-i="'+i+'"]'), d.n);
+      if(!!d.on!==L.on){ const b=q('[data-led="'+i+'"]'); if(b) b.click(); }
+      if(!!d.m!==L.muted){ const b=q('[data-mute="'+i+'"]'); if(b) b.click(); }
+      if(!!d.so!==L.solo){ const b=q('[data-solo="'+i+'"]'); if(b) b.click(); }
+    }); }
+  let _t; function saveLast(){ clearTimeout(_t); _t=setTimeout(()=>{ try{ localStorage.setItem("loopstation:last",JSON.stringify(serializeState())); }catch(e){} },500); }
+  ["input","change"].forEach(ev=>document.addEventListener(ev,saveLast,true));
+  try{ const u=window.LoopPatch&&LoopPatch.readURL(); if(u){ applyState(u); if(footEl) footEl.textContent="loaded shared patch"; }
+    else { const last=localStorage.getItem("loopstation:last"); if(last) applyState(JSON.parse(last)); } }catch(e){}
+  const shr=$("shareBtn"); if(shr) shr.onclick=()=>{ if(window.LoopPatch) LoopPatch.copyShare(serializeState()).then(()=>{ if(footEl) footEl.textContent="link copied — paste to share this rig"; }); };
+
+  // Web MIDI: map a hardware controller to any knob/fader (MIDI-learn)
+  let midiReady=false, learnMode=false; const mbn=$("midiBtn");
+  const targetOf=el=>{ if(el.dataset&&el.dataset.p){ const m={level:"lvl",pitch:"pit",tone:"ton",len:"len"}[el.dataset.p]; return m?m+el.dataset.i:null; } return {space:"space",age:"age",wow:"wow",vol:"master"}[el.id]||null; };
+  function applyMIDI(t,v){ const g={space:"space",age:"age",wow:"wow",master:"vol"}; if(g[t]){ setRange($(g[t]),v); return; }
+    const m=t.match(/^(lvl|pit|ton|len)(\d)$/); if(!m) return; const pm={lvl:"level",pit:"pitch",ton:"tone",len:"len"}, p=pm[m[1]], i=+m[2];
+    setRange(q('[data-p="'+p+'"][data-i="'+i+'"]'), p==="pitch"?Math.round(v*48-24):v); }
+  if(mbn) mbn.onclick=async ()=>{ if(!midiReady){ midiReady=true; if(window.LoopMIDI) await LoopMIDI.init({ onCC:applyMIDI, onStatus:s=>{ if(footEl) footEl.textContent=s; } }); }
+    learnMode=!learnMode; mbn.classList.toggle("on",learnMode); if(footEl) footEl.textContent=learnMode?"MIDI learn: touch a knob, then move a hardware control":"MIDI on"; };
+  document.addEventListener("pointerdown",e=>{ if(!learnMode||!window.LoopMIDI) return; const el=e.target.closest('input[type=range]'); if(!el) return; const t=targetOf(el); if(!t) return; LoopMIDI.learn(t); if(footEl) footEl.textContent="move a hardware control → "+t; },true);
+})();
+</script>
+</body>
+</html>
